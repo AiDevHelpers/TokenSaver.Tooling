@@ -1,0 +1,263 @@
+{
+  "name": "tokensaver-vscode",
+  "displayName": "TokenSaver",
+  "publisher": "local",
+  "description": "VS Code extension that manages the TokenSaver.MCP server and registers it as an MCP provider.",
+  "version": "1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/local/tokensaver"
+  },
+  "engines": {
+    "vscode": "^1.125.0"
+  },
+  "type": "module",
+  "main": "./dist/extension.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "package": "vsce package --out tokensaver.vsix --no-dependencies",
+    "package:vsix": "pwsh -File ..\\..\\.\\build\\scripts\\build-vsix.ps1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "@types/vscode": "^1.125.0",
+    "typescript": "^5.4.0"
+  },
+  "files": [
+    "dist/**",
+    "bin/DraftModel.Setup/**",
+    "bin/TokenSaver.Setup/**",
+    "package.json",
+    "CHANGELOG.md",
+    "LICENSE",
+    "INSTALL_PROMPT.md"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "tokenSaver.startServer",
+        "title": "Start TokenSaver MCP Server",
+        "category": "TokenSaver"
+      },
+      {
+        "command": "tokenSaver.stopServer",
+        "title": "Stop TokenSaver MCP Server",
+        "category": "TokenSaver"
+      },
+      {
+        "command": "tokenSaver.restartServer",
+        "title": "Restart TokenSaver MCP Server",
+        "category": "TokenSaver"
+      },
+      {
+        "command": "tokenSaver.showStatus",
+        "title": "Show TokenSaver Status",
+        "category": "TokenSaver"
+      },
+      {
+        "command": "tokenSaver.showLogs",
+        "title": "Show TokenSaver Logs",
+        "category": "TokenSaver"
+      },
+      {
+        "command": "tokenSaver.toggleAutoCodeHelper",
+        "title": "Toggle CodeHelper Auto-Workflow",
+        "category": "TokenSaver"
+      },
+      {
+        "command": "tokenSaver.installService",
+        "title": "Install DraftModel as Windows Service",
+        "category": "TokenSaver"
+      },
+      {
+        "command": "tokenSaver.uninstallService",
+        "title": "Uninstall DraftModel Windows Service",
+        "category": "TokenSaver"
+      },
+      {
+        "command": "tokenSaver.installMcpService",
+        "title": "Install TokenSaver MCP",
+        "category": "TokenSaver"
+      },
+      {
+        "command": "tokenSaver.uninstallMcpService",
+        "title": "Uninstall TokenSaver.MCP Windows Service",
+        "category": "TokenSaver"
+      },
+      {
+        "command": "tokenSaver.openInstallPrompt",
+        "title": "Open AI Install prompt",
+        "category": "TokenSaver"
+      },
+      {
+        "command": "tokenSaver.runFullSetup",
+        "title": "Run Full Setup (Install DraftModel + TokenSaver, wait for both to be ready, open AI instructions)",
+        "category": "TokenSaver"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "tokenSaver.startServer",
+          "when": "true"
+        },
+        {
+          "command": "tokenSaver.stopServer",
+          "when": "true"
+        },
+        {
+          "command": "tokenSaver.restartServer",
+          "when": "true"
+        },
+        {
+          "command": "tokenSaver.showStatus",
+          "when": "true"
+        },
+        {
+          "command": "tokenSaver.showLogs",
+          "when": "true"
+        },
+        {
+          "command": "tokenSaver.toggleAutoCodeHelper",
+          "when": "true"
+        },
+        {
+          "command": "tokenSaver.installService",
+          "when": "true"
+        },
+        {
+          "command": "tokenSaver.uninstallService",
+          "when": "true"
+        },
+        {
+          "command": "tokenSaver.installMcpService",
+          "when": "true"
+        },
+        {
+          "command": "tokenSaver.uninstallMcpService",
+          "when": "true"
+        },
+        {
+          "command": "tokenSaver.openInstallPrompt",
+          "when": "true"
+        },
+        {
+          "command": "tokenSaver.runFullSetup",
+          "when": "true"
+        }
+      ]
+    },
+    "mcpServerDefinitionProviders": [
+      {
+        "id": "TokenSaver",
+        "label": "TokenSaver"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "TokenSaver",
+      "properties": {
+        "tokenSaver.autostart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically start the TokenSaver MCP server when the extension activates.",
+          "order": 1
+        },
+        "tokenSaver.server.port": {
+          "type": "number",
+          "default": 11436,
+          "description": "Port the TokenSaver MCP server listens on.",
+          "order": 2
+        },
+        "tokenSaver.server.startTimeout": {
+          "type": "number",
+          "default": 30,
+          "description": "Seconds to wait for the server to become reachable after launch.",
+          "order": 3
+        },
+        "tokenSaver.server.idleTimeout": {
+          "type": "number",
+          "default": 0,
+          "description": "Stop the server after this many seconds of inactivity. 0 disables idle shutdown.",
+          "order": 4
+        },
+        "tokenSaver.dotnet.command": {
+          "type": "string",
+          "default": "dotnet",
+          "description": "The dotnet executable used to launch the TokenSaver.MCP server.",
+          "order": 5
+        },
+        "tokenSaver.dotnet.projectPath": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to the TokenSaver.MCP project directory. Defaults to the sibling TokenSaver.MCP folder relative to the extension.",
+          "order": 6
+        },
+        "tokenSaver.notifications.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable or disable TokenSaver notifications.",
+          "order": 7
+        },
+        "tokenSaver.notifications.level": {
+          "type": "string",
+          "enum": [
+            "all",
+            "errors"
+          ],
+          "default": "all",
+          "description": "Show only error notifications or all TokenSaver notifications.",
+          "order": 8
+        },
+        "tokenSaver.verboseLogging": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable verbose logging in the TokenSaver output channel.",
+          "order": 9
+        },
+        "tokenSaver.draftModel.exePath": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to DraftModel.Loader.exe. Defaults to the location where the bundled MSI installs it (Program Files\\DraftModel\\DraftModel.Loader.exe, see build/wix/DraftModel.Setup).",
+          "order": 10
+        },
+        "tokenSaver.mcp.exePath": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to TokenSaver.MCP.exe. Defaults to the location where the bundled MSI installs it (Program Files\\TokenSaver\\TokenSaver.MCP.exe, see src/Installers/TokenSaver.Setup).",
+          "order": 10.5
+        },
+        "tokenSaver.draftModel.healthUrl": {
+          "type": "string",
+          "default": "http://localhost:11435/health",
+          "description": "Health check URL for DraftModel.Loader. Checked on startup and after any MCP response slower than 30 seconds.",
+          "order": 11
+        },
+        "tokenSaver.draftModel.startTimeout": {
+          "type": "number",
+          "default": 600,
+          "description": "Seconds to wait for DraftModel.Loader to become reachable after launch. First run requires downloading base models which can take several minutes.",
+          "order": 12
+        },
+        "tokenSaver.autoCodeHelper.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable CodeHelper auto-workflow: intercepts code-build prompts, requests a skeleton design from the AI, implements what it can, and returns deferred items for the AI to complete.",
+          "order": 13
+        },
+        "tokenSaver.autoInstallPrompt": {
+          "type": "boolean",
+          "default": true,
+          "description": "On first activation, if the DraftModel/TokenSaver Windows services aren't installed and the bundled MSIs are available, ask once whether to install them (via the bundled MSIs). Disable to never be asked; you can still install manually via the 'TokenSaver: Install TokenSaver MCP' / 'TokenSaver: Install DraftModel as Windows Service' commands.",
+          "order": 14
+        }
+      }
+    }
+  }
+}
+
+

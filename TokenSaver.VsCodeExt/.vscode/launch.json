@@ -1,0 +1,51 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "TokenSaver.VsCodeExt: Debug Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "runtimeExecutable": "${execPath}",
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "preLaunchTask": "npm: build",
+      "env": {
+        "NODE_NO_WARNINGS": "1"
+      }
+    },
+    {
+      "name": "TokenSaver.VsCodeExt: Debug Installed VSIX",
+      "type": "extensionHost",
+      "request": "launch",
+      "runtimeExecutable": "${execPath}",
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "preLaunchTask": "build-vsix-install",
+      "env": {
+        "NODE_NO_WARNINGS": "1"
+      }
+    },
+    {
+      // Full rebuild+publish+install+launch, but as a REAL installed extension rather than
+      // an Extension Development Host: preLaunchTask runs launch-vscode-with-installed-
+      // extension, which itself depends on rebuild-publish-install-vsix (full dotnet publish
+      // of TokenSaver.MCP/DraftModel.Loader, npm build, vsce package, and
+      // `code --install-extension --force`) and then opens a plain `code --new-window`.
+      //
+      // No debugger attaches to that new window's extension host — this configuration exists
+      // purely so F5 can drive the whole rebuild/publish/install/launch chain as a single
+      // command; there's nothing left for the debug adapter to attach to once the tasks
+      // finish, so it launches a harmless no-op (node --version) and exits immediately. Use
+      // "Debug Installed VSIX" above instead when you need the debugger attached to the
+      // extension host.
+      "name": "TokenSaver.VsCodeExt: Rebuild, Publish, Install, Launch",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--version"],
+      "preLaunchTask": "launch-vscode-with-installed-extension",
+      "internalConsoleOptions": "neverOpen"
+    }
+  ]
+}
+
