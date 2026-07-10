@@ -6,7 +6,7 @@
   "compilationOptions": {},
   "targets": {
     ".NETCoreApp,Version=v10.0": {
-      "TokenSaver.MCP/1.0.8-alpha-g2027602b3d": {
+      "TokenSaver.MCP/1.0.9-alpha-g2e2655efa9": {
         "dependencies": {
           "Microsoft.Extensions.Hosting.WindowsServices": "10.0.9",
           "ModelContextProtocol.AspNetCore": "1.4.0",
@@ -16,7 +16,7 @@
           "TokenSaver.AgentHelpers.OpenSource": "1.0.0",
           "TokenSaver.AgentHelpers.Qwen": "1.0.0",
           "TokenSaver.CodeHelper": "1.0.0",
-          "TokenSaver.Common.Logger": "1.0.0",
+          "TokenSaver.Common.Logging": "1.0.0",
           "TokenSaver.Config": "1.0.0",
           "TokenSaver.ContextHelper": "1.0.0",
           "TokenSaver.Docs": "1.0.0",
@@ -401,7 +401,7 @@
         "runtime": {
           "TokenSaver.AgentHelpers.Anthropic.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.8.8231"
+            "fileVersion": "1.0.9.11814"
           }
         }
       },
@@ -409,7 +409,7 @@
         "runtime": {
           "TokenSaver.AgentHelpers.Core.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.8.8231"
+            "fileVersion": "1.0.9.11814"
           }
         }
       },
@@ -420,7 +420,7 @@
         "runtime": {
           "TokenSaver.AgentHelpers.DeepSeek.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.8.8231"
+            "fileVersion": "1.0.9.11814"
           }
         }
       },
@@ -431,7 +431,7 @@
         "runtime": {
           "TokenSaver.AgentHelpers.OpenSource.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.8.8231"
+            "fileVersion": "1.0.9.11814"
           }
         }
       },
@@ -442,7 +442,7 @@
         "runtime": {
           "TokenSaver.AgentHelpers.Qwen.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.8.8231"
+            "fileVersion": "1.0.9.11814"
           }
         }
       },
@@ -456,11 +456,11 @@
         "runtime": {
           "TokenSaver.CodeHelper.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.8.8231"
+            "fileVersion": "1.0.9.11814"
           }
         }
       },
-      "TokenSaver.Common.Logger/1.0.0": {
+      "TokenSaver.Common.Logging/1.0.0": {
         "dependencies": {
           "Serilog": "4.4.0",
           "Serilog.Extensions.Hosting": "10.0.0",
@@ -470,7 +470,7 @@
           "Serilog.Sinks.File": "7.0.0"
         },
         "runtime": {
-          "TokenSaver.Common.Logger.dll": {
+          "TokenSaver.Common.Logging.dll": {
             "assemblyVersion": "1.0.0.0",
             "fileVersion": "1.0.0.0"
           }
@@ -483,7 +483,7 @@
         "runtime": {
           "TokenSaver.Config.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.8.8231"
+            "fileVersion": "1.0.9.11814"
           }
         }
       },
@@ -491,7 +491,7 @@
         "runtime": {
           "TokenSaver.ContextHelper.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.8.8231"
+            "fileVersion": "1.0.9.11814"
           }
         }
       },
@@ -504,7 +504,7 @@
         "runtime": {
           "TokenSaver.Database.Context.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.8.8231"
+            "fileVersion": "1.0.9.11814"
           }
         }
       },
@@ -517,7 +517,7 @@
         "runtime": {
           "TokenSaver.Docs.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.8.8231"
+            "fileVersion": "1.0.9.11814"
           }
         }
       },
@@ -529,14 +529,14 @@
         "runtime": {
           "TokenSaver.Library.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.8.8231"
+            "fileVersion": "1.0.9.11814"
           }
         }
       }
     }
   },
   "libraries": {
-    "TokenSaver.MCP/1.0.8-alpha-g2027602b3d": {
+    "TokenSaver.MCP/1.0.9-alpha-g2e2655efa9": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
@@ -746,7 +746,7 @@
       "serviceable": false,
       "sha512": ""
     },
-    "TokenSaver.Common.Logger/1.0.0": {
+    "TokenSaver.Common.Logging/1.0.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
