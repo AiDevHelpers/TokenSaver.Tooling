@@ -59,8 +59,13 @@ let cachedDraftExePath = "";
 // The extension has direct UI access (showInformationMessage), so it asks the user itself
 // instead of relaying through the AI the way the MCP-side GitignorePrompt has to.
 
-interface TokenSaverBehaviorConfig {
+interface RepoHelperBehaviorConfig {
     addTokenSaverToGitignore?: boolean | null;
+    optimizeInstructions?: boolean | null;
+}
+
+interface TokenSaverBehaviorConfig {
+    repoHelper?: RepoHelperBehaviorConfig | null;
 }
 
 function globalBehaviorConfigPath(): string {
@@ -84,11 +89,12 @@ function readBehaviorConfigFile(filePath: string): TokenSaverBehaviorConfig | nu
     }
 }
 
-function readMergedBehaviorConfig(workspaceRoot: string): TokenSaverBehaviorConfig {
+function readMergedBehaviorConfig(workspaceRoot: string): RepoHelperBehaviorConfig {
     const local = readBehaviorConfigFile(localBehaviorConfigPath(workspaceRoot));
     const global = readBehaviorConfigFile(globalBehaviorConfigPath());
     return {
-        addTokenSaverToGitignore: local?.addTokenSaverToGitignore ?? global?.addTokenSaverToGitignore ?? null,
+        addTokenSaverToGitignore:
+            local?.repoHelper?.addTokenSaverToGitignore ?? global?.repoHelper?.addTokenSaverToGitignore ?? null,
     };
 }
 
@@ -155,7 +161,10 @@ async function maybePromptAddTokenSaverToGitignore(): Promise<void> {
     const targetPath = scopeGlobal ? globalBehaviorConfigPath() : localBehaviorConfigPath(workspaceRoot);
 
     try {
-        writeBehaviorConfigValue(targetPath, (cfg) => ({ ...cfg, addTokenSaverToGitignore: add }));
+        writeBehaviorConfigValue(targetPath, (cfg) => ({
+            ...cfg,
+            repoHelper: { ...cfg.repoHelper, addTokenSaverToGitignore: add },
+        }));
     } catch (err) {
         log(`Failed to persist gitignore preference to ${targetPath}: ${(err as Error).message}`);
     }
