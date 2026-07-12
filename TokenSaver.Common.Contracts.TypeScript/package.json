@@ -1,0 +1,21 @@
+{
+  "name": "@tokensaver/common-contracts",
+  "version": "1.0.0",
+  "description": "Shared TypeScript contracts/interfaces for TokenSaver services (mirrors .NET contracts)",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@tokensaver/common-models": "^1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test"
+  }
+}
