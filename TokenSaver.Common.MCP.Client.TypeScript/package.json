@@ -1,0 +1,21 @@
+{
+  "name": "@tokensaver/mcp-client",
+  "version": "1.0.0",
+  "description": "TypeScript/JavaScript HTTP client for TokenSaver MCP server",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@tokensaver/common-models": "^1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test"
+  }
+}
