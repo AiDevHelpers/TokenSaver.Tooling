@@ -1,0 +1,18 @@
+{
+  "name": "@tokensaver/common-installation",
+  "version": "1.0.0",
+  "description": "Shared TypeScript installation utilities for TokenSaver (workspace detection, service paths, version management)",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test"
+  }
+}
