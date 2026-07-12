@@ -17,4 +17,8 @@
     <ProjectReference Include="..\..\Core\TokenSaver.Common.Core\TokenSaver.Common.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Update="Nerdbank.GitVersioning" Version="3.10.91" />
+  </ItemGroup>
+
 </Project>

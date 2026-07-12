@@ -6,6 +6,7 @@ using TokenSaver.Client.Helpers.Health;
 using TokenSaver.Client.Helpers.Logging;
 using TokenSaver.Client.Helpers.WindowsService;
 using TokenSaver.Config;
+using TokenSaver.Config.Contracts;
 using McpHealthReport = TokenSaver.Client.Helpers.Health.McpHealthReport;
 
 namespace TokenSaver.Vs.Extension;
@@ -67,7 +68,7 @@ public sealed class TokenSaverExtension : IDisposable
             return;
 
         var (add, isGlobal) = shouldAdd.Value;
-        var scope = isGlobal ? TokenSaver.Config.ConfigScope.Global : TokenSaver.Config.ConfigScope.Local;
+        var scope = isGlobal ? ConfigScope.Global : ConfigScope.Local;
 
         BehaviorConfigManager.UpdateConfigValue(_workspaceRoot, scope, cfg =>
         {

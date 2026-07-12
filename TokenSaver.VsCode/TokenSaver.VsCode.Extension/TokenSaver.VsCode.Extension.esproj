@@ -90,7 +90,6 @@
          (CI, `dotnet publish` from the CLI) invoke Publish explicitly rather than Build. -->
     <PublishCommand>"$(PwshExe)" -NoProfile -ExecutionPolicy Bypass -File "$(MSBuildThisFileDirectory)..\..\..\..\scripts\build-vsix.ps1" -NoInstall$(_BuildVsixNoBuildArg)</PublishCommand>
   </PropertyGroup>
-
   <PropertyGroup Condition="'$(SkipDotnetPublish)' == 'true'">
     <_BuildVsixNoBuildArg> -NoBuild</_BuildVsixNoBuildArg>
   </PropertyGroup>
