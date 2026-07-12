@@ -1,0 +1,97 @@
+<Project Sdk="Microsoft.VisualStudio.JavaScript.Sdk/1.0.5277448">
+  <PropertyGroup>
+    <!--
+      Fixes: "Your project does not reference '.NETCoreApp,Version=v6.0' framework. Add a
+      reference to '.NETCoreApp,Version=v6.0' in the 'TargetFrameworks' property ... and then
+      re-run NuGet restore." (seen from VS 18's Microsoft.NuGet.targets during solution
+      restore/build.)
+
+      This project has no .NET code and no TargetFramework at all — it's a pure TypeScript/npm
+      VS Code extension built via the JS SDK's own BuildCommand (npm run build), not MSBuild
+      compilation. Some NuGet/VS versions don't recognize Microsoft.VisualStudio.JavaScript.Sdk
+      as a non-package-reference project style by default, so NuGet's restore falls back to
+      assuming a PackageReference-style .NET project and then can't find a TargetFramework to
+      restore against. Setting RestoreProjectStyle explicitly to Unknown tells NuGet's restore
+      target to skip package-graph restore for this project entirely, matching how the JS SDK
+      actually builds it (via npm/tsc, not `dotnet restore`/PackageReference).
+    -->
+    <RestoreProjectStyle>Unknown</RestoreProjectStyle>
+    <!--
+      BuildCommand/WatchCommand/CleanCommand/StartupCommand run via MSBuild's Exec task
+      (Microsoft.VisualStudio.JavaScript.Sdk's CoreCompile target). In some build contexts
+      (observed: automation/remote sessions where ComSpec isn't set at Machine/User scope,
+      only transiently on the invoking process) Exec's CreateProcess-based invocation can't
+      resolve even bare "cmd" or "npm" via PATH/PATHEXT — MSB3073 exit code 9009. Not
+      reproducible from an interactive prompt, where cmd/npm both resolve fine; this is an
+      environment-inheritance gap in the specific process tree MSBuild's Exec task runs in.
+      Fixed by invoking the Node.js install's known absolute path directly, bypassing PATH/
+      ComSpec resolution entirely — matches this repo's Node.js install location
+      (C:\Program Files\nodejs). If Node.js is ever installed elsewhere, override NodeJsDir
+      via `-p:NodeJsDir=...` or edit below.
+    -->
+    <NodeJsDir Condition="'$(NodeJsDir)' == ''">C:\Program Files\nodejs</NodeJsDir>
+    <!--
+      Same PATH-resolution gap as NodeJsDir above, but for pwsh: bare "pwsh" fails with
+      MSB3073 exit code 9009 from this Exec task even when `pwsh` resolves fine from an
+      interactive prompt and even after PowerShell 7 is confirmed present in the Machine PATH
+      registry value. The process tree MSBuild's Exec task runs in inherits a stale/cached
+      environment block from before PowerShell 7 was installed; only a full path bypasses that
+      resolution entirely. Matches this repo's PowerShell 7 install location
+      (C:\Program Files\PowerShell\7). If installed elsewhere, override via
+      `-p:PwshExe=...\pwsh.exe` or edit below.
+    -->
+    <PwshExe Condition="'$(PwshExe)' == ''">C:\Program Files\PowerShell\7\pwsh.exe</PwshExe>
+    <!--
+      BuildCommand runs the full VSIX packaging pipeline (same as PublishCommand below), not
+      just `npm run build`/tsc, so a plain VS "Build Solution"/"Build All"/Rebuild produces
+      build/dist/tokensaver.vsix (both MSIs bundled, no raw exes) without a separate manual
+      step. It calls build-vsix.ps1, which does its own nested `dotnet publish` of
+      TokenSaver.MCP and DraftModel.Loader plus two WiX MSI builds.
+
+      IMPORTANT — this only works because TokenSaverMCP.slnx gives this project explicit
+      <BuildDependency> entries on TokenSaver/TokenSaver.MCP/TokenSaver.MCP.csproj and
+      DraftModel/DraftModel.Loader/DraftModel.Loader.csproj (see the .slnx's
+      TokenSaver.VsCode.Extension.esproj entry). Without that, VS builds every project in the
+      solution in parallel by default, and build-vsix.ps1's nested `dotnet publish` of
+      TokenSaver.MCP (which itself depends on TokenSaver.Docs) would run CONCURRENTLY with
+      VS's own solution-wide build compiling TokenSaver.Docs as one of its normal projects —
+      two independent MSBuild invocations racing to write
+      TokenSaver.Docs\obj\Debug\net10.0\...GeneratedMSBuildEditorConfig.editorconfig at the
+      same time. That was hit for real here: MSB3073 from Sdk.targets plus "The process cannot
+      access the file ... because it is being used by another process." as the causal error,
+      and it isn't safe to just retry past — it's inherent to two builds of the same project
+      overlapping. The BuildDependency entries force VS to fully finish building
+      TokenSaver.MCP.csproj/DraftModel.Loader.csproj (and everything they depend on,
+      including TokenSaver.Docs) before this project's build starts, so by the time
+      build-vsix.ps1's own `dotnet publish` runs, nothing else in the solution build is still
+      touching those projects' obj/ output. If you ever see the
+      GeneratedMSBuildEditorConfig.editorconfig file-lock error again, check the
+      BuildDependency entries in TokenSaverMCP.slnx before assuming this script is broken —
+      that's almost certainly what regressed.
+
+      Always passes -NoInstall: a Build/Rebuild shouldn't reach out and uninstall/reinstall
+      the developer's local VS Code extension as a side effect the way the script does by
+      default when run manually from a terminal. Use scripts/build-vsix.ps1 directly
+      (without -NoInstall) for that, or use the "Publish" action / `dotnet publish` on this
+      .esproj, which runs the identical pipeline (kept in sync with BuildCommand below).
+
+      -NoBuild lets `dotnet build|publish -p:SkipDotnetPublish=true` skip the (slow) nested
+      dotnet publish of TokenSaver.MCP/DraftModel.Loader and the WiX MSI rebuilds, and just
+      repackage the VSIX from whatever is already in bin/ — useful for iterating on the
+      TypeScript/package.json side only without waiting on two MSI builds every time.
+    -->
+    <BuildCommand>"$(PwshExe)" -NoProfile -ExecutionPolicy Bypass -File "$(MSBuildThisFileDirectory)..\..\..\..\scripts\build-vsix.ps1" -NoInstall$(_BuildVsixNoBuildArg)</BuildCommand>
+    <WatchCommand>"$(NodeJsDir)\npm.cmd" run watch</WatchCommand>
+    <CleanCommand>"$(NodeJsDir)\npx.cmd" rimraf dist</CleanCommand>
+    <StartupCommand>"$(NodeJsDir)\npm.cmd" run watch</StartupCommand>
+    <!-- Publish runs the identical pipeline as BuildCommand above — see that property's
+         comment for the full rationale and the BuildDependency requirement in
+         TokenSaverMCP.slnx. Kept as a separate, equivalent property since some workflows
+         (CI, `dotnet publish` from the CLI) invoke Publish explicitly rather than Build. -->
+    <PublishCommand>"$(PwshExe)" -NoProfile -ExecutionPolicy Bypass -File "$(MSBuildThisFileDirectory)..\..\..\..\scripts\build-vsix.ps1" -NoInstall$(_BuildVsixNoBuildArg)</PublishCommand>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(SkipDotnetPublish)' == 'true'">
+    <_BuildVsixNoBuildArg> -NoBuild</_BuildVsixNoBuildArg>
+  </PropertyGroup>
+</Project>
