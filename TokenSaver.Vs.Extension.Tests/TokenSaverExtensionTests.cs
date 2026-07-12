@@ -54,7 +54,7 @@ public sealed class TokenSaverExtensionTests
 
             // Check that we logged something
             var defaultLogger = (DefaultExtensionLogger)logger;
-            Assert.NotEmpty(defaultLogger.Entries);
+            Assert.NotEmpty(defaultLogger.GetEntries());
         }
         finally
         {
