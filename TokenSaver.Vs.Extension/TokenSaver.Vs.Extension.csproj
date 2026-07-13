@@ -1,35 +1,38 @@
-<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+<Project Sdk="Microsoft.NET.Sdk">
 
+  <!--
+    TokenSaver Visual Studio 2026 extension.
+
+    Uses the out-of-process VisualStudio.Extensibility model (NOT the classic in-process VSSDK):
+    the extension runs in its own .NET host process, so it targets modern .NET and produces a
+    real, installable VSIX straight from `dotnet build` via Microsoft.VisualStudio.Extensibility.Build.
+
+    Target framework is net8.0-windows: that is the runtime the VisualStudio.Extensibility SDK
+    supports and that Visual Studio hosts out-of-proc extensions on. A net8.0 assembly loads on
+    VS 2026 regardless of the .NET version VS itself ships (forward-compatible). We intentionally do
+    NOT reference the repo's net10 libraries (TokenSaver.Config / TokenSaver.Client.Helpers) here —
+    the extension is a thin client that talks to the already-running TokenSaver.MCP server over HTTP
+    and controls the Windows service, which keeps the VSIX small and the extension reliable.
+  -->
   <PropertyGroup>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <TargetFramework>net8.0-windows</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
-    <Deterministic>true</Deterministic>
-    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-    <GeneratePkgDefFile>true</GeneratePkgDefFile>
-    <UseCodebase>true</UseCodebase>
-    <CopyBuildOutputToOutputPath>true</CopyBuildOutputToOutputPath>
-    <CopyOutputSymbolsToOutputPath>false</CopyOutputSymbolsToOutputPath>
-    <StartAction>Program</StartAction>
-    <StartProgram Condition="'$(DevEnvDir)' != ''">$(DevEnvDir)devenv.exe</StartProgram>
-    <StartArguments>/rootsuffix Exp</StartArguments>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWpf>true</UseWpf>
+    <!-- The Output Window extensibility API (Views().Output.CreateOutputChannelAsync, used by the
+         DraftModel commands to show responses) is still marked preview by the SDK. -->
+    <NoWarn>$(NoWarn);VSEXTPREVIEW_OUTPUTWINDOW</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.14.40265" />
-    <PackageReference Include="Microsoft.VisualStudio.Threading" Version="18.7.23" />
+    <PackageReference Include="Microsoft.VisualStudio.Extensibility.Sdk" Version="17.14.40608" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.VisualStudio.Extensibility.Build" Version="17.14.40608" PrivateAssets="all" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="8.0.1" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\..\Core\TokenSaver.Client.Helpers\TokenSaver.Client.Helpers.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="source.extension.vsixmanifest">
-      <SubType>Form</SubType>
-    </None>
-  </ItemGroup>
-
+  <!-- Override the repo-wide Nerdbank.GitVersioning (3.9.50, injected by Directory.Build.props)
+       up to 3.10.91 via Update so there is no duplicate PackageReference. -->
   <ItemGroup>
     <PackageReference Update="Nerdbank.GitVersioning" Version="3.10.91" />
   </ItemGroup>

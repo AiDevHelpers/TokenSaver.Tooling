@@ -3,6 +3,7 @@ import { spawn } from "child_process";
 import * as net from "node:net";
 import * as path from "path";
 import * as fs from "fs";
+import { registerDraftModelChatProvider } from "./draftModelChatProvider.js";
 
 let channelTokenSaver: vscode.OutputChannel;
 let channelDraftModel: vscode.OutputChannel;
@@ -335,6 +336,7 @@ export async function activate(context: vscode.ExtensionContext) {
     // Install Prompt" command instead. registerMcpProvider() below is unaffected: it uses
     // VS Code's own registerMcpServerDefinitionProvider API, not a config-file write.
     registerMcpProvider(context);
+    registerDraftModelChatProvider(context, log);
     void ensureInstalled(context);
     void maybePromptForServiceInstall(context);
     void maybePromptAddTokenSaverToGitignore();

@@ -1,13 +1,11 @@
 using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
-using TokenSaver.Client.Helpers.Configuration;
-using TokenSaver.Client.Helpers.Health;
-using TokenSaver.Client.Helpers.Logging;
-using TokenSaver.Client.Helpers.WindowsService;
-using TokenSaver.Config;
-using TokenSaver.Config.Contracts;
-using McpHealthReport = TokenSaver.Client.Helpers.Health.McpHealthReport;
+using TokenSaver.Vs.Extension.Configuration;
+using TokenSaver.Vs.Extension.Health;
+using TokenSaver.Vs.Extension.Logging;
+using TokenSaver.Vs.Extension.WindowsService;
+using McpHealthReport = TokenSaver.Vs.Extension.Health.McpHealthReport;
 
 namespace TokenSaver.Vs.Extension;
 
@@ -27,7 +25,6 @@ public sealed class TokenSaverExtension : IDisposable
     {
         _workspaceRoot = workspaceRoot ?? throw new ArgumentNullException(nameof(workspaceRoot));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        ExtensionLoggerFacade.SetLogger(_logger);
     }
 
     /// <summary>

@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 using System.Threading.Tasks;
-using TokenSaver.Client.Helpers.Logging;
+using TokenSaver.Vs.Extension.Logging;
 using Xunit;
 
 namespace TokenSaver.Vs.Extension.Tests;
