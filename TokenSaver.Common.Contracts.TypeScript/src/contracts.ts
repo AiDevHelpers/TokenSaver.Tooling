@@ -231,6 +231,56 @@ export interface IToolRegistry {
 }
 
 /**
+ * Client-extension settings shared by the TokenSaver VS Code and Visual Studio extensions.
+ * Mirrors TokenSaver.Config.Contracts.IExtensionSettings (.NET) — the VS Code extension's
+ * `tokenSaver.*` package.json settings map onto this shape 1:1 (see
+ * TokenSaver.VsCode.Extension/package.json's `contributes.configuration`); the Visual Studio
+ * extension mirrors the same shape locally in Configuration/BehaviorConfig.cs.
+ */
+export interface IExtensionSettings {
+  /** tokenSaver.autostart */
+  autostart?: boolean;
+  /** tokenSaver.verboseLogging */
+  verboseLogging?: boolean;
+  /** tokenSaver.autoCodeHelper.enabled */
+  autoCodeHelperEnabled?: boolean;
+  /** tokenSaver.autoInstallPrompt */
+  autoInstallPrompt?: boolean;
+  /** tokenSaver.mcp.exePath */
+  mcpExePath?: string;
+  server?: IExtensionServerSettings;
+  dotnet?: IExtensionDotnetSettings;
+  notifications?: IExtensionNotificationsSettings;
+  draftModel?: IExtensionDraftModelSettings;
+}
+
+/** tokenSaver.server.* */
+export interface IExtensionServerSettings {
+  port?: number;
+  startTimeout?: number;
+  idleTimeout?: number;
+}
+
+/** tokenSaver.dotnet.* */
+export interface IExtensionDotnetSettings {
+  command?: string;
+  projectPath?: string;
+}
+
+/** tokenSaver.notifications.* */
+export interface IExtensionNotificationsSettings {
+  enabled?: boolean;
+  level?: "all" | "errors";
+}
+
+/** tokenSaver.draftModel.* */
+export interface IExtensionDraftModelSettings {
+  exePath?: string;
+  healthUrl?: string;
+  startTimeout?: number;
+}
+
+/**
  * Tool definition - describes an MCP tool
  */
 export interface ToolDefinition {
