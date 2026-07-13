@@ -3,17 +3,20 @@
   <Metadata>
     <Identity Id="TokenSaver.Vs.Extension" Version="0.1.0" Language="en-US" Publisher="TokenSaver" />
     <DisplayName>TokenSaver</DisplayName>
-    <Description xml:space="preserve">AI-native code indexing and context building for Visual Studio</Description>
+    <Description xml:space="preserve">AI-native code indexing and context building for Visual Studio 2026. Manages the TokenSaver.MCP server (start/stop the Windows service and check its health) from the Extensions menu.</Description>
     <MoreInfo>https://github.com/rsperry79/TokenSaver</MoreInfo>
-    <License>LICENSE.txt</License>
     <ReleaseNotes>https://github.com/rsperry79/TokenSaver/releases</ReleaseNotes>
-    <Icon>Resources\Icon.png</Icon>
-    <PreviewImage>Resources\Preview.png</PreviewImage>
   </Metadata>
-  <Installation>
-    <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[17.0,)" />
-    <InstallationTarget Id="Microsoft.VisualStudio.Pro" Version="[17.0,)" />
-    <InstallationTarget Id="Microsoft.VisualStudio.Enterprise" Version="[17.0,)" />
+  <Installation ExtensionType="VSSDK+VisualStudio.Extensibility">
+    <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[18.0,)">
+      <ProductArchitecture>amd64</ProductArchitecture>
+    </InstallationTarget>
+    <InstallationTarget Id="Microsoft.VisualStudio.Pro" Version="[18.0,)">
+      <ProductArchitecture>amd64</ProductArchitecture>
+    </InstallationTarget>
+    <InstallationTarget Id="Microsoft.VisualStudio.Enterprise" Version="[18.0,)">
+      <ProductArchitecture>amd64</ProductArchitecture>
+    </InstallationTarget>
   </Installation>
   <Prerequisites>
     <Prerequisite Id="Microsoft.VisualStudio.Component.CoreEditor" Version="[17.0,)" Condition="has(Microsoft.VisualStudio.Component.CoreEditor)" />

@@ -3,16 +3,20 @@
   <!--
     TokenSaver Visual Studio 2026 extension.
 
-    Uses the out-of-process VisualStudio.Extensibility model (NOT the classic in-process VSSDK):
-    the extension runs in its own .NET host process, so it targets modern .NET and produces a
-    real, installable VSIX straight from `dotnet build` via Microsoft.VisualStudio.Extensibility.Build.
+    Built on the VisualStudio.Extensibility model, but hosted IN-PROCESS (VssdkCompatibleExtension,
+    RequiresInProcessHosting on ExtensionEntrypoint) rather than out-of-process. That switch was
+    needed to get a real Tools > Options page (ProvideOptionPageAttribute/DialogPage only exist in
+    the classic VSSDK, which in-proc hosting gives access to — see Options/TokenSaverOptionsPage.cs).
+    Manifest metadata now lives in source.extension.vsixmanifest (a static file) instead of
+    ExtensionEntrypoint's generated Metadata, because in-proc extensions require the classic
+    Microsoft.VisualStudio.VsPackage asset entry that the generated manifest can't express.
 
-    Target framework is net8.0-windows: that is the runtime the VisualStudio.Extensibility SDK
-    supports and that Visual Studio hosts out-of-proc extensions on. A net8.0 assembly loads on
-    VS 2026 regardless of the .NET version VS itself ships (forward-compatible). We intentionally do
-    NOT reference the repo's net10 libraries (TokenSaver.Config / TokenSaver.Client.Helpers) here —
-    the extension is a thin client that talks to the already-running TokenSaver.MCP server over HTTP
-    and controls the Windows service, which keeps the VSIX small and the extension reliable.
+    Target framework is still net8.0-windows — VS 2026 hosts in-proc VSSDK-compatible extensions on
+    .NET 8 same as out-of-process ones (unlike VS 2022, which required net472 for in-proc). We
+    intentionally do NOT reference the repo's net10 libraries (TokenSaver.Config /
+    TokenSaver.Client.Helpers) here — the extension is a thin client that talks to the already-running
+    TokenSaver.MCP server over HTTP and controls the Windows service, which keeps the VSIX small and
+    the extension reliable.
   -->
   <PropertyGroup>
     <TargetFramework>net8.0-windows</TargetFramework>
@@ -20,14 +24,21 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWpf>true</UseWpf>
+    <VssdkCompatibleExtension>true</VssdkCompatibleExtension>
     <!-- The Output Window extensibility API (Views().Output.CreateOutputChannelAsync, used by the
          DraftModel commands to show responses) is still marked preview by the SDK. -->
-    <NoWarn>$(NoWarn);VSEXTPREVIEW_OUTPUTWINDOW</NoWarn>
+    <!-- NU1701: Microsoft.VisualStudio.Sdk (needed for DialogPage/ProvideOptionPageAttribute, see
+         Options/TokenSaverPackage.cs) only ships net472/netstandard2.0 assets on NuGet. That's
+         expected for in-proc VSSDK-compatible extensions: these are compile-time reference
+         assemblies only — at runtime the types resolve against the real Microsoft.VisualStudio.
+         Shell.15.0 already loaded in devenv.exe, not this NuGet copy. -->
+    <NoWarn>$(NoWarn);VSEXTPREVIEW_OUTPUTWINDOW;NU1701</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.VisualStudio.Extensibility.Sdk" Version="17.14.40608" PrivateAssets="all" />
     <PackageReference Include="Microsoft.VisualStudio.Extensibility.Build" Version="17.14.40608" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.VisualStudio.Sdk" Version="17.14.40265" PrivateAssets="all" ExcludeAssets="runtime" />
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="8.0.1" />
   </ItemGroup>
 

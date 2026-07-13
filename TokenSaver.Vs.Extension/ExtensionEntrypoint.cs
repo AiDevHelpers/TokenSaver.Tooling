@@ -17,27 +17,13 @@ internal sealed class ExtensionEntrypoint : global::Microsoft.VisualStudio.Exten
     /// <inheritdoc/>
     public override ExtensionConfiguration ExtensionConfiguration => new()
     {
-        Metadata = new(
-            id: "TokenSaver.Vs.Extension",
-            // this.ExtensionAssemblyVersion reflects AssemblyVersion. Nerdbank.GitVersioning
-            // normally pins that at 1.0.0.0 for binding stability, which made every build look
-            // identical to the VSIX installer (a "modify --vsix" of the same version is a no-op).
-            // The project-local version.json overrides assemblyVersion.precision to "build", so
-            // AssemblyVersion here tracks git height like FileVersion does elsewhere in the repo.
-            version: this.ExtensionAssemblyVersion,
-            publisherName: "TokenSaver",
-            displayName: "TokenSaver",
-            description: "AI-native code indexing and context building for Visual Studio 2026. Manages the TokenSaver.MCP server (start/stop the Windows service and check its health) from the Extensions menu.")
-        {
-            // Include VS 2026 (18.x). Without this the default would be [17.14, 18.0), excluding 2026.
-            InstallationTargetVersion = "[17.14,)",
-
-            // We build against net8.0; declare it so Visual Studio hosts the extension on .NET 8
-            // rather than treating a mismatch as best-effort.
-            DotnetTargetVersions = [DotnetTarget.Net8],
-
-            MoreInfo = "https://github.com/rsperry79/TokenSaver",
-        },
+        // In-process (VSSDK-compatible) extensions must have a null Metadata: the manifest is the
+        // static source.extension.vsixmanifest file instead of this source-generated one, because
+        // in-proc hosting needs the classic Microsoft.VisualStudio.VsPackage asset entry (for the
+        // ProvideOptionPageAttribute-based Tools > Options page) that the generated manifest has no
+        // way to express. See source.extension.vsixmanifest for the id/display name/description/
+        // installation-target metadata that used to live here.
+        RequiresInProcessHosting = true,
     };
 
     /// <inheritdoc/>

@@ -1,28 +1,20 @@
 using System.Globalization;
-using System.Windows;
+using System.Windows.Controls;
 
 using TokenSaver.Vs.Extension.Configuration;
 
-namespace TokenSaver.Vs.Extension.Settings;
+namespace TokenSaver.Vs.Extension.Options;
 
-/// <summary>
-/// WPF settings dialog for the TokenSaver Visual Studio extension. Edits
-/// <see cref="ExtensionBehaviorConfig"/>, persisted to the global (%ProgramData%) config file via
-/// <see cref="BehaviorConfigManager"/> — see that type for why this is global-only rather than
-/// per-workspace.
-/// </summary>
-public partial class SettingsWindow : Window
+/// <summary>WPF content of <see cref="TokenSaverOptionsPage"/> — see that type's remarks.</summary>
+public partial class TokenSaverOptionsControl : UserControl
 {
-    public SettingsWindow()
+    public TokenSaverOptionsControl()
     {
         InitializeComponent();
-        Load();
     }
 
-    private void Load()
+    internal void Load(ExtensionBehaviorConfig settings)
     {
-        var settings = BehaviorConfigManager.GetExtensionSettings();
-
         AutostartCheckBox.IsChecked = settings.Autostart ?? true;
         VerboseLoggingCheckBox.IsChecked = settings.VerboseLogging ?? false;
         PortTextBox.Text = (settings.Server?.Port ?? 11436).ToString(CultureInfo.InvariantCulture);
@@ -31,20 +23,24 @@ public partial class SettingsWindow : Window
         DraftModelExePathTextBox.Text = settings.DraftModel?.ExePath ?? "";
         DraftModelHealthUrlTextBox.Text = settings.DraftModel?.HealthUrl ?? "http://localhost:11435/health";
         DraftModelStartTimeoutTextBox.Text = (settings.DraftModel?.StartTimeout ?? 600).ToString(CultureInfo.InvariantCulture);
+        StatusTextBlock.Text = string.Empty;
     }
 
-    private void SaveButton_Click(object sender, RoutedEventArgs e)
+    internal bool TryBuildSettings(out ExtensionBehaviorConfig settings, out string? error)
     {
         if (!TryParseInt(PortTextBox.Text, out var port) ||
             !TryParseInt(StartTimeoutTextBox.Text, out var startTimeout) ||
             !TryParseInt(IdleTimeoutTextBox.Text, out var idleTimeout) ||
             !TryParseInt(DraftModelStartTimeoutTextBox.Text, out var draftModelStartTimeout))
         {
-            StatusTextBlock.Text = "Timeouts and the port must be whole numbers.";
-            return;
+            error = "Timeouts and the port must be whole numbers.";
+            StatusTextBlock.Text = error;
+            settings = new ExtensionBehaviorConfig();
+            return false;
         }
 
-        var settings = new ExtensionBehaviorConfig
+        error = null;
+        settings = new ExtensionBehaviorConfig
         {
             Autostart = AutostartCheckBox.IsChecked ?? true,
             VerboseLogging = VerboseLoggingCheckBox.IsChecked ?? false,
@@ -61,16 +57,7 @@ public partial class SettingsWindow : Window
                 StartTimeout = draftModelStartTimeout,
             },
         };
-
-        BehaviorConfigManager.SaveExtensionSettings(settings);
-        DialogResult = true;
-        Close();
-    }
-
-    private void CancelButton_Click(object sender, RoutedEventArgs e)
-    {
-        DialogResult = false;
-        Close();
+        return true;
     }
 
     private static bool TryParseInt(string text, out int value) =>
