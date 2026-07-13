@@ -19,6 +19,11 @@ internal sealed class ExtensionEntrypoint : global::Microsoft.VisualStudio.Exten
     {
         Metadata = new(
             id: "TokenSaver.Vs.Extension",
+            // this.ExtensionAssemblyVersion reflects AssemblyVersion. Nerdbank.GitVersioning
+            // normally pins that at 1.0.0.0 for binding stability, which made every build look
+            // identical to the VSIX installer (a "modify --vsix" of the same version is a no-op).
+            // The project-local version.json overrides assemblyVersion.precision to "build", so
+            // AssemblyVersion here tracks git height like FileVersion does elsewhere in the repo.
             version: this.ExtensionAssemblyVersion,
             publisherName: "TokenSaver",
             displayName: "TokenSaver",
