@@ -20,7 +20,6 @@
     "package:vsix": "pwsh -File ..\\..\\.\\build\\scripts\\build-vsix.ps1"
   },
   "dependencies": {
-    "@tokensaver/draftmodel-provider": "file:../TokenSaver.Common.DraftModelProvider.TypeScript"
   },
   "devDependencies": {
     "@types/node": "^26.0.1",
@@ -29,7 +28,7 @@
   },
   "files": [
     "dist/**",
-    "bin/DraftModel.Setup/**",
+    "bin/SimpleModelServer.Setup/**",
     "bin/TokenSaver.Setup/**",
     "package.json",
     "CHANGELOG.md",
@@ -73,12 +72,12 @@
       },
       {
         "command": "tokenSaver.installService",
-        "title": "Install DraftModel as Windows Service",
+        "title": "Install SimpleModelServer as Windows Service",
         "category": "TokenSaver"
       },
       {
         "command": "tokenSaver.uninstallService",
-        "title": "Uninstall DraftModel Windows Service",
+        "title": "Uninstall SimpleModelServer Windows Service",
         "category": "TokenSaver"
       },
       {
@@ -98,7 +97,7 @@
       },
       {
         "command": "tokenSaver.runFullSetup",
-        "title": "Run Full Setup (Install DraftModel + TokenSaver, wait for both to be ready, open AI instructions)",
+        "title": "Run Full Setup (Install SimpleModelServer + TokenSaver, wait for both to be ready, open AI instructions)",
         "category": "TokenSaver"
       }
     ],
@@ -158,12 +157,6 @@
       {
         "id": "TokenSaver",
         "label": "TokenSaver"
-      }
-    ],
-    "languageModelChatProviders": [
-      {
-        "vendor": "draftmodel",
-        "displayName": "DraftModel"
       }
     ],
     "configuration": {
@@ -228,10 +221,10 @@
           "description": "Enable verbose logging in the TokenSaver output channel.",
           "order": 9
         },
-        "tokenSaver.draftModel.exePath": {
+        "tokenSaver.simpleModelServer.exePath": {
           "type": "string",
           "default": "",
-          "description": "Absolute path to DraftModel.Loader.exe. Defaults to the location where the bundled MSI installs it (Program Files\\DraftModel\\DraftModel.Loader.exe, see build/wix/DraftModel.Setup).",
+          "description": "Absolute path to SimpleModelServer.Server.exe. Defaults to the location where the bundled MSI installs it (Program Files\\SimpleModelServer\\SimpleModelServer.Server.exe, see ../SimpleModelServer/build/wix/SimpleModelServer.Setup).",
           "order": 10
         },
         "tokenSaver.mcp.exePath": {
@@ -240,16 +233,16 @@
           "description": "Absolute path to TokenSaver.MCP.exe. Defaults to the location where the bundled MSI installs it (Program Files\\TokenSaver\\TokenSaver.MCP.exe, see src/Installers/TokenSaver.Setup).",
           "order": 10.5
         },
-        "tokenSaver.draftModel.healthUrl": {
+        "tokenSaver.simpleModelServer.healthUrl": {
           "type": "string",
           "default": "http://localhost:11435/health",
-          "description": "Health check URL for DraftModel.Loader. Checked on startup and after any MCP response slower than 30 seconds.",
+          "description": "Health check URL for SimpleModelServer. Checked on startup and after any MCP response slower than 30 seconds.",
           "order": 11
         },
-        "tokenSaver.draftModel.startTimeout": {
+        "tokenSaver.simpleModelServer.startTimeout": {
           "type": "number",
           "default": 600,
-          "description": "Seconds to wait for DraftModel.Loader to become reachable after launch. First run requires downloading base models which can take several minutes.",
+          "description": "Seconds to wait for SimpleModelServer to become reachable after launch. First run requires downloading base models which can take several minutes.",
           "order": 12
         },
         "tokenSaver.autoCodeHelper.enabled": {
@@ -261,7 +254,7 @@
         "tokenSaver.autoInstallPrompt": {
           "type": "boolean",
           "default": true,
-          "description": "On first activation, if the DraftModel/TokenSaver Windows services aren't installed and the bundled MSIs are available, ask once whether to install them (via the bundled MSIs). Disable to never be asked; you can still install manually via the 'TokenSaver: Install TokenSaver MCP' / 'TokenSaver: Install DraftModel as Windows Service' commands.",
+          "description": "On first activation, if the SimpleModelServer/TokenSaver Windows services aren't installed and the bundled MSIs are available, ask once whether to install them (via the bundled MSIs). Disable to never be asked; you can still install manually via the 'TokenSaver: Install TokenSaver MCP' / 'TokenSaver: Install SimpleModelServer as Windows Service' commands.",
           "order": 14
         }
       }
