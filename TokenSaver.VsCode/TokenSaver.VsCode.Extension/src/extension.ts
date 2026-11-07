@@ -5,7 +5,7 @@ import * as path from "path";
 import * as fs from "fs";
 
 let channelTokenSaver: vscode.OutputChannel;
-let channelDraftModel: vscode.OutputChannel;
+let channelSimpleModelServer: vscode.OutputChannel;
 let statusBar: vscode.StatusBarItem;
 let logsStatusBar: vscode.StatusBarItem;
 
@@ -22,7 +22,7 @@ let stdoutLineBuffer = "";
 // src/Installers/TokenSaver.Setup, running from Program Files\TokenSaver) is managing the
 // process. In this mode we do not spawn/kill a child process or run an idle-shutdown timer;
 // we use sc.exe to start/stop and adopt whatever is already listening on the configured port.
-// Mirrors the equivalent DraftModelLoader service-mode handling below.
+// Mirrors the equivalent SimpleModelServer service-mode handling below.
 const TOKENSAVER_SERVICE_NAME = "TokenSaverMCP";
 let usingTokenSaverWindowsService = false;
 let cachedTokenSaverExePath = "";
@@ -32,22 +32,22 @@ let tokenSaverServiceLogPoller: ReturnType<typeof setTimeout> | null = null;
 let lastTokenSaverServiceRecordId = 0;
 const TOKENSAVER_EVENT_LOG_SOURCE = "TokenSaver";
 
-// DraftModel.Loader process
-let draftProcess: ReturnType<typeof spawn> | null = null;
-let draftStartPromise: Promise<void> | null = null;
-let stoppingDraftProcess: Promise<void> | null = null;
-let draftHealthCheckInProgress = false;
+// SimpleModelServer process
+let simpleModelServerProcess: ReturnType<typeof spawn> | null = null;
+let simpleModelServerStartPromise: Promise<void> | null = null;
+let stoppingSimpleModelServerProcess: Promise<void> | null = null;
+let simpleModelServerHealthCheckInProgress = false;
 
 // Windows service log polling
-let draftServiceLogPoller: ReturnType<typeof setTimeout> | null = null;
-let lastDraftServiceRecordId = 0;
-const DRAFTMODEL_EVENT_LOG_SOURCE = "DraftModel";
+let simpleModelServerServiceLogPoller: ReturnType<typeof setTimeout> | null = null;
+let lastSimpleModelServerServiceRecordId = 0;
+const SIMPLEMODEL_SERVER_EVENT_LOG_SOURCE = "SimpleModelServer";
 
-// Windows service mode — true when DraftModelLoader SCM service is managing the process.
+// Windows service mode — true when SimpleModelServer SCM service is managing the process.
 // In this mode we do not spawn/kill a child process; we use sc.exe to start/stop.
-const DRAFT_SERVICE_NAME = "DraftModelLoader";
-let usingWindowsService = false;
-let cachedDraftExePath = "";
+const SIMPLEMODEL_SERVER_SERVICE_NAME = "SimpleModelServer";
+let usingSimpleModelServerWindowsService = false;
+let cachedSimpleModelServerExePath = "";
 
 // ─── .tokensaver/config.json behavior config ─────────────────────────────────
 //
@@ -221,7 +221,7 @@ export async function activate(context: vscode.ExtensionContext) {
     migrateLegacySettings();
 
     channelTokenSaver = vscode.window.createOutputChannel("TokenSaver");
-    channelDraftModel = vscode.window.createOutputChannel("DraftModel");
+    channelSimpleModelServer = vscode.window.createOutputChannel("SimpleModelServer");
 
     statusBar = vscode.window.createStatusBarItem(
         vscode.StatusBarAlignment.Left,
@@ -244,14 +244,14 @@ export async function activate(context: vscode.ExtensionContext) {
         statusBar,
         logsStatusBar,
         channelTokenSaver,
-        channelDraftModel,
+        channelSimpleModelServer,
         vscode.commands.registerCommand("tokenSaver.startServer", async () => {
-            await startDraftModel(context);
+            await startSimpleModelServer(context);
             await startServer(context);
         }),
         vscode.commands.registerCommand("tokenSaver.stopServer", async () => {
             await stopServer();
-            await stopDraftModel();
+            await stopSimpleModelServer();
             // (context available in closure for potential future use)
         }),
         vscode.commands.registerCommand(
@@ -264,15 +264,15 @@ export async function activate(context: vscode.ExtensionContext) {
             channelTokenSaver.show(true);
         }),
         vscode.commands.registerCommand("tokenSaver.showStatus", async () => {
-            await startDraftModel(context);
+            await startSimpleModelServer(context);
             await startServer(context);
             showStatusInLog();
         }),
         vscode.commands.registerCommand("tokenSaver.installService", async () => {
-            await installDraftModelService(context);
+            await installSimpleModelServerService(context);
         }),
         vscode.commands.registerCommand("tokenSaver.uninstallService", async () => {
-            await uninstallDraftModelService(context);
+            await uninstallSimpleModelServerService(context);
         }),
         vscode.commands.registerCommand("tokenSaver.installMcpService", async () => {
             await installTokenSaverService(context);
@@ -343,7 +343,7 @@ export async function activate(context: vscode.ExtensionContext) {
         .getConfiguration("tokenSaver")
         .get<boolean>("autostart", true);
     if (autostart) {
-        await startDraftModel(context);
+        await startSimpleModelServer(context);
         await startServer(context);
         await checkMcpHealth(context);
         // Full /health self-test (fault-tracking + self-test checks), not just /mcp
@@ -361,10 +361,10 @@ const SERVICE_INSTALL_PROMPT_ASKED_KEY = "tokenSaver.serviceInstallPromptAsked";
 
 /**
  * On first activation (per machine/profile — tracked via globalState, not per-session), if
- * neither the TokenSaverMCP nor DraftModelLoader Windows services are installed and the
+ * neither the TokenSaverMCP nor SimpleModelServer Windows services are installed and the
  * bundled MSIs are present (see build-vsix.ps1 / bin/*.Setup), asks the user once whether to
- * install them via the same msiexec path the "Install TokenSaver MCP" / "Install DraftModel
- * as Windows Service" commands use (installTokenSaverService / installDraftModelService).
+ * install them via the same msiexec path the "Install TokenSaver MCP" / "Install SimpleModelServer
+ * as Windows Service" commands use (installTokenSaverService / installSimpleModelServerService).
  * Without this, a user has to know those commands exist and run them manually after installing
  * the VSIX — this closes that gap while still asking permission before an admin-elevating
  * msiexec install runs. Respects tokenSaver.autoInstallPrompt (default true) and never asks
@@ -379,18 +379,18 @@ async function maybePromptForServiceInstall(context: vscode.ExtensionContext) {
     }
 
     const mcpMsi = tokenSaverMsiPath(context);
-    const draftMsi = draftModelMsiPath(context);
+    const simpleModelServerMsi = simpleModelServerMsiPath(context);
     const mcpMsiAvailable = fs.existsSync(mcpMsi);
-    const draftMsiAvailable = fs.existsSync(draftMsi);
-    if (!mcpMsiAvailable && !draftMsiAvailable) return; // no bundled installers — nothing to offer
+    const simpleModelServerMsiAvailable = fs.existsSync(simpleModelServerMsi);
+    if (!mcpMsiAvailable && !simpleModelServerMsiAvailable) return; // no bundled installers — nothing to offer
 
-    const [mcpInstalled, draftInstalled] = await Promise.all([
+    const [mcpInstalled, simpleModelServerInstalled] = await Promise.all([
         isServiceInstalled(TOKENSAVER_SERVICE_NAME),
-        isServiceInstalled(DRAFT_SERVICE_NAME),
+        isServiceInstalled(SIMPLEMODEL_SERVER_SERVICE_NAME),
     ]);
     const needsMcpInstall = mcpMsiAvailable && !mcpInstalled;
-    const needsDraftInstall = draftMsiAvailable && !draftInstalled;
-    if (!needsMcpInstall && !needsDraftInstall) {
+    const needsSimpleModelServerInstall = simpleModelServerMsiAvailable && !simpleModelServerInstalled;
+    if (!needsMcpInstall && !needsSimpleModelServerInstall) {
         // Already installed (or no bundled MSI for what's missing) — remember we don't need to ask.
         await context.globalState.update(SERVICE_INSTALL_PROMPT_ASKED_KEY, true);
         return;
@@ -418,8 +418,8 @@ async function maybePromptForServiceInstall(context: vscode.ExtensionContext) {
  * "TokenSaver: Run Full Setup" command for re-running after a partial/failed attempt.
  *
  * Does, in order, only stopping early if a step fails:
- *   1. Install DraftModelLoader service (skipped if already installed).
- *   2. Wait for DraftModel.Loader to report healthy on its /health endpoint — this can take
+ *   1. Install SimpleModelServer service (skipped if already installed).
+ *   2. Wait for SimpleModelServer to report healthy on its /health endpoint — this can take
  *      several minutes on first run (base model download/warmup), so it uses
  *      tokenSaver.simpleModelServer.startTimeout (default 600s), not the short server-restart-style
  *      timeout used elsewhere.
@@ -430,7 +430,7 @@ async function maybePromptForServiceInstall(context: vscode.ExtensionContext) {
  *
  * Each step re-checks actual system state (isServiceInstalled/health polling) rather than
  * trusting that a previous call's promise resolving means the step truly succeeded — the same
- * defensive pattern installDraftModelService/installTokenSaverService already use, since a
+ * defensive pattern installSimpleModelServerService/installTokenSaverService already use, since a
  * silently-swallowed UI interaction (e.g. a missed click, or msiexec failing after the promise
  * already resolved) must not be allowed to cascade into later steps running against a system
  * that isn't actually ready.
@@ -438,21 +438,21 @@ async function maybePromptForServiceInstall(context: vscode.ExtensionContext) {
 async function runFullSetup(context: vscode.ExtensionContext): Promise<void> {
     log("=== TokenSaver full setup starting ===");
 
-    // Step 1: DraftModel service install.
-    if (!(await isServiceInstalled(DRAFT_SERVICE_NAME))) {
-        await installDraftModelService(context);
-        if (!(await isServiceInstalled(DRAFT_SERVICE_NAME))) {
-            logDraft("Full setup: DraftModelLoader service is still not installed after install step — aborting.");
+    // Step 1: SimpleModelServer service install.
+    if (!(await isServiceInstalled(SIMPLEMODEL_SERVER_SERVICE_NAME))) {
+        await installSimpleModelServerService(context);
+        if (!(await isServiceInstalled(SIMPLEMODEL_SERVER_SERVICE_NAME))) {
+            logSimpleModelServer("Full setup: SimpleModelServer service is still not installed after install step — aborting.");
             vscode.window.showErrorMessage(
-                "TokenSaver setup failed: DraftModel.Loader did not install. See the DraftModel output channel for details.",
+                "TokenSaver setup failed: SimpleModelServer did not install. See the SimpleModelServer output channel for details.",
             );
             return;
         }
     } else {
-        logDraft("Full setup: DraftModelLoader service already installed — skipping install.");
+        logSimpleModelServer("Full setup: SimpleModelServer service already installed — skipping install.");
     }
 
-    // Step 2: wait for DraftModel to actually be healthy, not just "installed".
+    // Step 2: wait for SimpleModelServer to actually be healthy, not just "installed".
     //
     // KNOWN ISSUE (seen twice during manual verification, both times immediately after a fresh
     // service install/restart): the router's HttpListener can come up "wedged" — the service
@@ -468,33 +468,33 @@ async function runFullSetup(context: vscode.ExtensionContext): Promise<void> {
     // condition a restart reliably fixes.
     const cfg = vscode.workspace.getConfiguration("tokenSaver");
     const healthUrl = cfg.get<string>("simpleModelServer.healthUrl", "http://localhost:11435/health");
-    const draftTimeoutSec = cfg.get<number>("simpleModelServer.startTimeout", 600);
-    logDraft(`Full setup: waiting up to ${draftTimeoutSec}s for DraftModel.Loader to report healthy...`);
+    const simpleModelServerTimeoutSec = cfg.get<number>("simpleModelServer.startTimeout", 600);
+    logSimpleModelServer(`Full setup: waiting up to ${simpleModelServerTimeoutSec}s for SimpleModelServer to report healthy...`);
     vscode.window.showInformationMessage(
-        "TokenSaver setup: waiting for DraftModel.Loader to finish starting (first run can take several minutes while models download/warm up)...",
+        "TokenSaver setup: waiting for SimpleModelServer to finish starting (first run can take several minutes while models download/warm up)...",
     );
 
-    const firstWaitSec = Math.max(30, Math.floor(draftTimeoutSec / 3));
-    let draftHealthy = await waitForHealthOk(healthUrl, firstWaitSec);
-    if (!draftHealthy) {
-        logDraft(
-            `Full setup: DraftModel.Loader still not healthy after ${firstWaitSec}s — this can happen when the ` +
+    const firstWaitSec = Math.max(30, Math.floor(simpleModelServerTimeoutSec / 3));
+    let simpleModelServerHealthy = await waitForHealthOk(healthUrl, firstWaitSec);
+    if (!simpleModelServerHealthy) {
+        logSimpleModelServer(
+            `Full setup: SimpleModelServer still not healthy after ${firstWaitSec}s — this can happen when the ` +
             "router's listener comes up wedged after a fresh install (see CLAUDE.md). Restarting the service once " +
             "and continuing to wait...",
         );
-        await runSc(["stop", DRAFT_SERVICE_NAME]);
+        await runSc(["stop", SIMPLEMODEL_SERVER_SERVICE_NAME]);
         await new Promise((r) => setTimeout(r, 2000));
-        await runSc(["start", DRAFT_SERVICE_NAME]);
-        draftHealthy = await waitForHealthOk(healthUrl, draftTimeoutSec - firstWaitSec);
+        await runSc(["start", SIMPLEMODEL_SERVER_SERVICE_NAME]);
+        simpleModelServerHealthy = await waitForHealthOk(healthUrl, simpleModelServerTimeoutSec - firstWaitSec);
     }
-    if (!draftHealthy) {
-        logDraft(`Full setup: DraftModel.Loader did not become healthy within ${draftTimeoutSec}s — aborting.`);
+    if (!simpleModelServerHealthy) {
+        logSimpleModelServer(`Full setup: SimpleModelServer did not become healthy within ${simpleModelServerTimeoutSec}s — aborting.`);
         vscode.window.showErrorMessage(
-            `TokenSaver setup failed: DraftModel.Loader did not become healthy within ${draftTimeoutSec}s. Check the DraftModel output channel.`,
+            `TokenSaver setup failed: SimpleModelServer did not become healthy within ${simpleModelServerTimeoutSec}s. Check the SimpleModelServer output channel.`,
         );
         return;
     }
-    logDraft("Full setup: DraftModel.Loader is healthy.");
+    logSimpleModelServer("Full setup: SimpleModelServer is healthy.");
 
     // Step 3: TokenSaver.MCP service install.
     if (!(await isServiceInstalled(TOKENSAVER_SERVICE_NAME))) {
@@ -535,7 +535,7 @@ async function runFullSetup(context: vscode.ExtensionContext): Promise<void> {
     await openInstallPrompt(context);
     log("=== TokenSaver full setup complete ===");
     vscode.window.showInformationMessage(
-        "TokenSaver setup complete: DraftModel.Loader and TokenSaver.MCP are both installed and running.",
+        "TokenSaver setup complete: SimpleModelServer and TokenSaver.MCP are both installed and running.",
     );
 }
 
@@ -652,7 +652,7 @@ interface McpHealthReport {
  * this never restarts the server: /health can legitimately report Degraded (draftmodel not
  * warmed up yet, self-test wiring hiccup, etc.) without the process itself being broken, so this
  * only logs and notifies — restarting on every Degraded would fight the same "restart-flapping"
- * problem checkAndHealDraftModel's health-based restart deliberately avoids for the DraftModel
+ * problem checkAndHealSimpleModelServer's health-based restart deliberately avoids for the SimpleModelServer
  * side by tolerating 503/degraded there too. Returns true if the endpoint was reachable at all
  * (regardless of status), false only if it couldn't be reached/parsed.
  */
@@ -700,7 +700,7 @@ async function checkMcpFullHealth(): Promise<boolean> {
 export function deactivate() {
     // Synchronous kills for the process.exit path — async stop won't run in time
     serverProcess?.kill();
-    draftProcess?.kill();
+    simpleModelServerProcess?.kill();
 }
 
 // Ensure child processes are killed even if the extension host is terminated
@@ -710,7 +710,7 @@ process.on("exit", () => {
         serverProcess?.kill();
     } catch {}
     try {
-        draftProcess?.kill();
+        simpleModelServerProcess?.kill();
     } catch {}
 });
 process.on("SIGTERM", () => {
@@ -718,7 +718,7 @@ process.on("SIGTERM", () => {
         serverProcess?.kill();
     } catch {}
     try {
-        draftProcess?.kill();
+        simpleModelServerProcess?.kill();
     } catch {}
     process.exit(0);
 });
@@ -727,73 +727,73 @@ process.on("SIGINT", () => {
         serverProcess?.kill();
     } catch {}
     try {
-        draftProcess?.kill();
+        simpleModelServerProcess?.kill();
     } catch {}
     process.exit(0);
 });
 
-// ─── DraftModel.Loader lifecycle ─────────────────────────────────────────────
+// ─── SimpleModelServer lifecycle ─────────────────────────────────────────────
 
 /**
- * Path to the WiX-installed DraftModel.Loader.exe (see build/wix/DraftModel.Setup —
- * INSTALLFOLDER under ProgramFiles64Folder\DraftModel). This is the exe the DraftModelLoader
+ * Path to the WiX-installed SimpleModelServer.exe (see build/wix/SimpleModelServer.Setup —
+ * INSTALLFOLDER under ProgramFiles64Folder\SimpleModelServer). This is the exe the SimpleModelServer
  * Windows service runs; the extension no longer bundles a raw copy of this exe, so this is the
  * only path used once the MSI has been installed. Mirrors tokenSaverInstalledExePath() below.
  */
-function draftLoaderExePath(context: vscode.ExtensionContext): string {
+function simpleModelServerExePath(context: vscode.ExtensionContext): string {
     const cfg = vscode.workspace.getConfiguration("tokenSaver");
     const override = cfg.get<string>("simpleModelServer.exePath", "");
     if (override) return override;
     const programFiles = process.env["ProgramFiles"] ?? "C:\\Program Files";
-    return path.join(programFiles, "DraftModel", "DraftModel.Loader.exe");
+    return path.join(programFiles, "SimpleModelServer", "SimpleModelServer.Server.exe");
 }
 
 /**
- * Path to the bundled WiX MSI (see build/wix/DraftModel.Setup), copied into
- * <extensionDir>/bin/DraftModel.Setup/DraftModel-Setup.msi by scripts/build-vsix.ps1.
- * Used by installDraftModelService()/uninstallDraftModelService() so those commands invoke the
+ * Path to the bundled WiX MSI (see build/wix/SimpleModelServer.Setup), copied into
+ * <extensionDir>/bin/SimpleModelServer.Setup/SimpleModelServer-Setup.msi by scripts/build-vsix.ps1.
+ * Used by installSimpleModelServerService()/uninstallSimpleModelServerService() so those commands invoke the
  * same installer a user would run standalone, rather than duplicating its sc.exe logic — same
  * pattern as tokenSaverMsiPath() below.
  */
-function draftModelMsiPath(context: vscode.ExtensionContext): string {
+function simpleModelServerMsiPath(context: vscode.ExtensionContext): string {
     return path.join(
         context.extensionPath,
         "bin",
-        "DraftModel.Setup",
-        "DraftModel-Setup.msi",
+        "SimpleModelServer.Setup",
+        "SimpleModelServer-Setup.msi",
     );
 }
 
-async function startDraftModel(context: vscode.ExtensionContext) {
+async function startSimpleModelServer(context: vscode.ExtensionContext) {
     // ── Service mode ────────────────────────────────────────────────────────
     const cfg0 = vscode.workspace.getConfiguration("tokenSaver");
     const healthUrl0 = cfg0.get<string>("simpleModelServer.healthUrl", "http://localhost:11435/health");
     const port0 = parseInt(new URL(healthUrl0).port, 10);
 
-    if (await isServiceInstalled(DRAFT_SERVICE_NAME)) {
-        usingWindowsService = true;
-        logDraft("DraftModelLoader Windows service detected.");
+    if (await isServiceInstalled(SIMPLEMODEL_SERVER_SERVICE_NAME)) {
+        usingSimpleModelServerWindowsService = true;
+        log("SimpleModelServer Windows service detected.");
         if (!(await isPortOpen("127.0.0.1", port0))) {
-            logDraft("Starting DraftModelLoader service...");
-            await runSc(["start", DRAFT_SERVICE_NAME]);
+            log("Starting SimpleModelServer service...");
+            await runSc(["start", SIMPLEMODEL_SERVER_SERVICE_NAME]);
         }
         const timeoutSec0 = cfg0.get<number>("simpleModelServer.startTimeout", 120);
         try { await waitForPortOpen("127.0.0.1", port0, timeoutSec0); }
-        catch { logDraft("DraftModel service did not become reachable in time."); }
-        await checkAndHealDraftModel(healthUrl0, context);
-        startDraftModelServiceLogPolling();
+        catch { log("SimpleModelServer service did not become reachable in time."); }
+        await checkAndHealSimpleModelServer(healthUrl0, context);
+        startSimpleModelServerServiceLogPolling();
         return;
     }
-    usingWindowsService = false;
+    usingSimpleModelServerWindowsService = false;
 
     // ── Process mode (legacy) ───────────────────────────────────────────────
-    if (draftProcess) return;
-    if (draftStartPromise) {
-        await draftStartPromise;
+    if (simpleModelServerProcess) return;
+    if (simpleModelServerStartPromise) {
+        await simpleModelServerStartPromise;
         return;
     }
-    if (stoppingDraftProcess) await stoppingDraftProcess;
-    if (draftProcess) return;
+    if (stoppingSimpleModelServerProcess) await stoppingSimpleModelServerProcess;
+    if (simpleModelServerProcess) return;
 
     const cfg = vscode.workspace.getConfiguration("tokenSaver");
     const healthUrl = cfg.get<string>(
@@ -801,19 +801,19 @@ async function startDraftModel(context: vscode.ExtensionContext) {
         "http://localhost:11435/health",
     );
     const timeoutSec = cfg.get<number>("simpleModelServer.startTimeout", 120);
-    const exe = draftLoaderExePath(context);
+    const exe = simpleModelServerExePath(context);
 
     // If something is already listening at the health URL, adopt it
     const port = new URL(healthUrl).port;
     if (await isPortOpen("127.0.0.1", parseInt(port, 10))) {
-        logDraft(
-            `DraftModel.Loader already running on port ${port} — adopted.`,
+        log(
+            `SimpleModelServer already running on port ${port} — adopted.`,
         );
-        await checkAndHealDraftModel(healthUrl, context);
+        await checkAndHealSimpleModelServer(healthUrl, context);
         return;
     }
 
-    logDraft(`Launching DraftModel.Loader: ${exe}`);
+    log(`Launching SimpleModelServer: ${exe}`);
 
     let proc: ReturnType<typeof spawn>;
     try {
@@ -822,82 +822,82 @@ async function startDraftModel(context: vscode.ExtensionContext) {
             windowsHide: true,
         });
     } catch (err) {
-        logDraft(
-            `Failed to spawn DraftModel.Loader: ${(err as Error).message}`,
+        log(
+            `Failed to spawn SimpleModelServer: ${(err as Error).message}`,
         );
         return;
     }
 
     if (!proc.pid) {
-        logDraft("DraftModel.Loader failed to obtain a PID.");
+        log("SimpleModelServer failed to obtain a PID.");
         return;
     }
 
-    draftProcess = proc;
+    simpleModelServerProcess = proc;
 
     proc.stdout?.on("data", (chunk: Buffer) => {
         for (const line of chunk.toString().split(/\r?\n/).filter(Boolean))
-            channelDraftModel.appendLine(line);
+            channelSimpleModelServer.appendLine(line);
     });
     proc.stderr?.on("data", (chunk: Buffer) =>
-        channelDraftModel.append(chunk.toString()),
+        channelSimpleModelServer.append(chunk.toString()),
     );
     proc.on("exit", (code, signal) => {
-        draftProcess = null;
+        simpleModelServerProcess = null;
         if (code !== 0 && signal == null)
-            logDraft(
-                `DraftModel.Loader exited with code=${code} signal=${signal}`,
+            log(
+                `SimpleModelServer exited with code=${code} signal=${signal}`,
             );
     });
     proc.on("error", (err) => {
-        draftProcess = null;
-        logDraft(`DraftModel.Loader error: ${err.message}`);
+        simpleModelServerProcess = null;
+        log(`SimpleModelServer error: ${err.message}`);
     });
 
-    draftStartPromise = (async () => {
+    simpleModelServerStartPromise = (async () => {
         try {
             await waitForPortOpen("127.0.0.1", parseInt(port, 10), timeoutSec);
-            logDraft("DraftModel.Loader is reachable.");
-            await checkAndHealDraftModel(healthUrl, context);
+            log("SimpleModelServer is reachable.");
+            await checkAndHealSimpleModelServer(healthUrl, context);
         } catch (err) {
-            logDraft(
-                `DraftModel.Loader startup timeout: ${(err as Error).message}`,
+            log(
+                `SimpleModelServer startup timeout: ${(err as Error).message}`,
             );
             proc.kill();
-            draftProcess = null;
+            simpleModelServerProcess = null;
         } finally {
-            draftStartPromise = null;
+            simpleModelServerStartPromise = null;
         }
     })();
 
-    await draftStartPromise;
+    await simpleModelServerStartPromise;
 }
 
-async function stopDraftModel() {
-    if (usingWindowsService) {
-        logDraft("Stopping DraftModelLoader service...");
-        await runSc(["stop", DRAFT_SERVICE_NAME]);
-        stopDraftModelServiceLogPolling();
+async function stopSimpleModelServer() {
+    if (usingSimpleModelServerWindowsService) {
+        log("Stopping SimpleModelServer service...");
+        await runSc(["stop", SIMPLEMODEL_SERVER_SERVICE_NAME]);
+        stopSimpleModelServerServiceLogPolling();
         return;
     }
-    if (!draftProcess) {
-        if (stoppingDraftProcess) await stoppingDraftProcess;
+    if (!simpleModelServerProcess) {
+        if (stoppingSimpleModelServerProcess) await stoppingSimpleModelServerProcess;
         return;
     }
-    if (stoppingDraftProcess) {
-        await stoppingDraftProcess;
+    if (stoppingSimpleModelServerProcess) {
+        await stoppingSimpleModelServerProcess;
         return;
     }
 
-    const proc = draftProcess;
-    draftProcess = null;
+    const proc = simpleModelServerProcess;
+    simpleModelServerProcess = null;
     let resolved = false;
 
-    stoppingDraftProcess = new Promise<void>((resolve) => {
+    stoppingSimpleModelServerProcess = new Promise<void>((resolve) => {
         const cleanup = () => {
             if (!resolved) {
                 resolved = true;
-                stoppingDraftProcess = null;
+                stoppingSimpleModelServerProcess = null;
                 resolve();
             }
         };
@@ -911,34 +911,34 @@ async function stopDraftModel() {
         }, 3000);
     });
 
-    await stoppingDraftProcess;
+    await stoppingSimpleModelServerProcess;
 }
 
 /**
  * Hits /health, and if the response is not 200 "ok", kills and restarts
- * DraftModel.Loader. Called on initial start and after any slow MCP response.
+ * SimpleModelServer. Called on initial start and after any slow MCP response.
  */
-export async function checkAndHealDraftModel(
+export async function checkAndHealSimpleModelServer(
     healthUrl: string,
     context: vscode.ExtensionContext,
 ): Promise<void> {
-    if (draftHealthCheckInProgress) return;
-    draftHealthCheckInProgress = true;
+    if (simpleModelServerHealthCheckInProgress) return;
+    simpleModelServerHealthCheckInProgress = true;
 
     try {
         const healthy = await fetchHealthOk(healthUrl);
         if (healthy) {
-            logDraft("DraftModel.Loader health: ok");
+            log("SimpleModelServer health: ok");
             return;
         }
 
-        logDraft("DraftModel.Loader health check failed — restarting...");
-        await stopDraftModel();
-        await startDraftModel(context);
+        log("SimpleModelServer health check failed — restarting...");
+        await stopSimpleModelServer();
+        await startSimpleModelServer(context);
     } catch (err) {
-        logDraft(`Health check error: ${(err as Error).message}`);
+        log(`Health check error: ${(err as Error).message}`);
     } finally {
-        draftHealthCheckInProgress = false;
+        simpleModelServerHealthCheckInProgress = false;
     }
 }
 
@@ -960,7 +960,7 @@ async function fetchHealthOk(healthUrl: string): Promise<boolean> {
 }
 
 function timestampPrefix(): string {
-    // Matches the yyyy-MM-dd HH:mm:ss convention already used by DraftModel.Loader/TokenSaver.MCP's
+    // Matches the yyyy-MM-dd HH:mm:ss convention already used by SimpleModelServer/TokenSaver.MCP's
     // own console/EventLog logging (see Program.cs in both projects), so lifecycle lines in the
     // output channel line up with the service's own log lines instead of showing no timestamp at
     // all (as plain appendLine did before) or a raw epoch/wire-format value.
@@ -969,41 +969,41 @@ function timestampPrefix(): string {
     return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
 }
 
-function logDraft(msg: string) {
-    channelDraftModel?.appendLine(`${timestampPrefix()} ${msg}`);
+function logSimpleModelServer(msg: string) {
+    channelSimpleModelServer?.appendLine(`${timestampPrefix()} ${msg}`);
 }
 
-function startDraftModelServiceLogPolling() {
-    stopDraftModelServiceLogPolling();
-    if (!usingWindowsService) return;
+function startSimpleModelServerServiceLogPolling() {
+    stopSimpleModelServerServiceLogPolling();
+    if (!usingSimpleModelServerWindowsService) return;
 
-    draftServiceLogPoller = setInterval(async () => {
+    simpleModelServerServiceLogPoller = setInterval(async () => {
         try {
-            await pollDraftModelServiceEventLog();
+            await pollSimpleModelServerServiceEventLog();
         } catch (err) {
-            logDraft(`DraftModel service log poll failed: ${(err as Error).message}`);
+            log(`SimpleModelServer service log poll failed: ${(err as Error).message}`);
         }
     }, 5000);
 
-    void pollDraftModelServiceEventLog();
+    void pollSimpleModelServerServiceEventLog();
 }
 
-function stopDraftModelServiceLogPolling() {
-    if (draftServiceLogPoller) {
-        clearInterval(draftServiceLogPoller);
-        draftServiceLogPoller = null;
+function stopSimpleModelServerServiceLogPolling() {
+    if (simpleModelServerServiceLogPoller) {
+        clearInterval(simpleModelServerServiceLogPoller);
+        simpleModelServerServiceLogPoller = null;
     }
 }
 
-async function pollDraftModelServiceEventLog() {
-    if (!usingWindowsService) return;
+async function pollSimpleModelServerServiceEventLog() {
+    if (!usingSimpleModelServerWindowsService) return;
     const { execFile } = await import("child_process");
     // TimeCreated must be reformatted to a plain string *before* ConvertTo-Json: PowerShell's
     // ConvertTo-Json serializes [DateTime] using the legacy "/Date(ms)/" wire format (a holdover
     // from old ASP.NET JSON conventions), and the TS side below just does
     // `entry.TimeCreated ?? ""` with no date parsing — so without this, the output channel
     // shows raw "/Date(1783200119153)/" strings instead of a readable timestamp.
-    const psCommand = `Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='${DRAFTMODEL_EVENT_LOG_SOURCE}'} -MaxEvents 50 | Select-Object @{n='TimeCreated';e={$_.TimeCreated.ToString('yyyy-MM-dd HH:mm:ss')}},RecordId,LevelDisplayName,Message | ConvertTo-Json -Compress`;
+    const psCommand = `Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='${SIMPLEMODEL_SERVER_EVENT_LOG_SOURCE}'} -MaxEvents 50 | Select-Object @{n='TimeCreated';e={$_.TimeCreated.ToString('yyyy-MM-dd HH:mm:ss')}},RecordId,LevelDisplayName,Message | ConvertTo-Json -Compress`;
 
     return new Promise<void>((resolve, reject) => {
         execFile(
@@ -1040,8 +1040,8 @@ async function pollDraftModelServiceEventLog() {
                     .filter((entry) => typeof entry.RecordId === "number")
                     .sort((a, b) => (a.RecordId! - b.RecordId!))
                     .forEach((entry) => {
-                        if (entry.RecordId! <= lastDraftServiceRecordId) return;
-                        lastDraftServiceRecordId = entry.RecordId!;
+                        if (entry.RecordId! <= lastSimpleModelServerServiceRecordId) return;
+                        lastSimpleModelServerServiceRecordId = entry.RecordId!;
                         const timestamp = entry.TimeCreated ?? "";
                         const level = entry.LevelDisplayName ?? "INFO";
                         const message = entry.Message ?? "";
@@ -1053,7 +1053,7 @@ async function pollDraftModelServiceEventLog() {
                         let first = true;
                         for (const line of message.split(/\r?\n/)) {
                             if (!line) continue;
-                            channelDraftModel?.appendLine(first ? `${timestamp} ${level} ${line}` : `    ${line}`);
+                            channelSimpleModelServer?.appendLine(first ? `${timestamp} ${level} ${line}` : `    ${line}`);
                             first = false;
                         }
                     });
@@ -1089,7 +1089,7 @@ function stopTokenSaverServiceLogPolling() {
 async function pollTokenSaverServiceEventLog() {
     if (!usingTokenSaverWindowsService) return;
     const { execFile } = await import("child_process");
-    // See the matching comment in pollDraftModelServiceEventLog for why TimeCreated is
+    // See the matching comment in pollSimpleModelServerServiceEventLog for why TimeCreated is
     // reformatted here rather than left as a raw [DateTime] — ConvertTo-Json would otherwise
     // emit the legacy "/Date(ms)/" wire format instead of a readable timestamp.
     const psCommand = `Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='${TOKENSAVER_EVENT_LOG_SOURCE}'} -MaxEvents 50 | Select-Object @{n='TimeCreated';e={$_.TimeCreated.ToString('yyyy-MM-dd HH:mm:ss')}},RecordId,LevelDisplayName,Message | ConvertTo-Json -Compress`;
@@ -1134,7 +1134,7 @@ async function pollTokenSaverServiceEventLog() {
                         const timestamp = entry.TimeCreated ?? "";
                         const level = entry.LevelDisplayName ?? "INFO";
                         const message = entry.Message ?? "";
-                        // See the matching comment in pollDraftModelServiceEventLog: stamp only
+                        // See the matching comment in pollSimpleModelServerServiceEventLog: stamp only
                         // the first line, indent continuation lines instead of repeating the
                         // same timestamp on every line of a stack trace.
                         let first = true;
@@ -1168,7 +1168,7 @@ function routeStdoutLine(line: string) {
             ex?: string;
         };
         const channel =
-            entry.ch === "DraftModel" ? channelDraftModel : channelTokenSaver;
+            entry.ch === "SimpleModelServer" ? channelSimpleModelServer : channelTokenSaver;
         const ts = entry.ts ? new Date(entry.ts).toLocaleTimeString() : "";
         const lvl = entry.lvl ?? "INF";
         const src = entry.src ? ` ${entry.src}:` : "";
@@ -1249,7 +1249,7 @@ async function startServer(context: vscode.ExtensionContext) {
     // ── Service mode ────────────────────────────────────────────────────────
     // If TokenSaverMCP is registered as a Windows service (installed via
     // src/Installers/TokenSaver.Setup, running from Program Files\TokenSaver), adopt it instead
-    // of spawning our own bundled copy — same pattern as startDraftModel's service-mode
+    // of spawning our own bundled copy — same pattern as startSimpleModelServer's service-mode
     // branch above. No idle-shutdown timer is scheduled in this mode: a service is meant to
     // stay running independent of this VS Code window's lifecycle, unlike a
     // spawn()-managed child process this extension owns.
@@ -1489,8 +1489,8 @@ async function stopServer() {
 async function restartServer(context: vscode.ExtensionContext) {
     updateStatus("restarting");
     await stopServer();
-    await stopDraftModel();
-    await startDraftModel(context);
+    await stopSimpleModelServer();
+    await startSimpleModelServer(context);
     await startServer(context);
 }
 
@@ -1531,7 +1531,7 @@ function registerMcpProvider(context: vscode.ExtensionContext) {
                 async provideMcpServerDefinitions(
                     _token: vscode.CancellationToken,
                 ) {
-                    await startDraftModel(context);
+                    await startSimpleModelServer(context);
                     await startServer(context);
                     const port =
                         actualServerPort ??
@@ -1551,7 +1551,7 @@ function registerMcpProvider(context: vscode.ExtensionContext) {
                     server,
                     _token: vscode.CancellationToken,
                 ) {
-                    await startDraftModel(context);
+                    await startSimpleModelServer(context);
                     await startServer(context);
                     return server;
                 },
@@ -1574,7 +1574,7 @@ const SLOW_RESPONSE_THRESHOLD_MS = 30_000;
 
 /**
  * Wraps a fetch/call to the MCP server. If it takes longer than
- * SLOW_RESPONSE_THRESHOLD_MS, fires a DraftModel health check in the
+ * SLOW_RESPONSE_THRESHOLD_MS, fires a SimpleModelServer health check in the
  * background after the call completes (or times out).
  */
 export async function withSlowResponseWatch<T>(
@@ -1592,7 +1592,7 @@ export async function withSlowResponseWatch<T>(
         return await fn();
     } finally {
         if (Date.now() - start >= SLOW_RESPONSE_THRESHOLD_MS) {
-            void checkAndHealDraftModel(healthUrl, context);
+            void checkAndHealSimpleModelServer(healthUrl, context);
         }
     }
 }
@@ -1653,12 +1653,12 @@ function showStatusInLog() {
             : `MCP server process running: ${serverProcess !== null}`,
     );
     channelTokenSaver.appendLine(
-        usingWindowsService
-            ? "DraftModel.Loader: running as Windows service (DraftModelLoader)"
-            : `DraftModel.Loader process running: ${draftProcess !== null}`,
+        usingSimpleModelServerWindowsService
+            ? "SimpleModelServer: running as Windows service (SimpleModelServer)"
+            : `SimpleModelServer process running: ${simpleModelServerProcess !== null}`,
     );
     channelTokenSaver.appendLine(
-        `DraftModel health URL: ${cfg.get<string>("simpleModelServer.healthUrl", "http://localhost:11435/health")}`,
+        `SimpleModelServer health URL: ${cfg.get<string>("simpleModelServer.healthUrl", "http://localhost:11435/health")}`,
     );
     channelTokenSaver.appendLine("==========================");
 }
@@ -1763,7 +1763,7 @@ async function findOpenPortInRange(
 // ── Windows Service helpers ───────────────────────────────────────────────────
 
 /** Returns true if the given Windows service name is registered with the SCM. */
-async function isServiceInstalled(serviceName: string = DRAFT_SERVICE_NAME): Promise<boolean> {
+async function isServiceInstalled(serviceName: string = SIMPLEMODEL_SERVER_SERVICE_NAME): Promise<boolean> {
     try {
         const { execFile } = await import("child_process");
         const out = await new Promise<string>((resolve, reject) => {
@@ -1788,46 +1788,46 @@ async function runSc(args: string[]): Promise<number> {
 }
 
 /**
- * Installs DraftModel.Loader as a Windows service (DraftModelLoader) by running the bundled
- * WiX MSI (see draftModelMsiPath / build/wix/DraftModel.Setup) via msiexec, instead of
+ * Installs SimpleModelServer as a Windows service (SimpleModelServer) by running the bundled
+ * WiX MSI (see simpleModelServerMsiPath / build/wix/SimpleModelServer.Setup) via msiexec, instead of
  * reimplementing the sc.exe create/config/failure sequence here — the MSI is the single
  * source of truth for how the service gets registered. Mirrors installTokenSaverService()
  * below. /qn runs the install silently; msiexec still shows its own UAC prompt since
  * installing a service requires admin rights.
  */
-async function installDraftModelService(context: vscode.ExtensionContext) {
-    if (await isServiceInstalled()) {
-        vscode.window.showInformationMessage("DraftModelLoader service is already installed.");
+async function installSimpleModelServerService(context: vscode.ExtensionContext) {
+    if (await isServiceInstalled(SIMPLEMODEL_SERVER_SERVICE_NAME)) {
+        vscode.window.showInformationMessage("SimpleModelServer service is already installed.");
         return;
     }
 
-    const msi = draftModelMsiPath(context);
+    const msi = simpleModelServerMsiPath(context);
     if (!fs.existsSync(msi)) {
         vscode.window.showErrorMessage(
-            `DraftModel.Loader installer not found at: ${msi}\nRebuild the VSIX with build\\scripts\\build-vsix.ps1 (requires the wix CLI: dotnet tool install -g wix).`,
+            `SimpleModelServer installer not found at: ${msi}\nRebuild the VSIX with build\\scripts\\build-vsix.ps1 (requires the wix CLI: dotnet tool install -g wix).`,
         );
         return;
     }
 
-    logDraft(`Running installer: ${msi}`);
+    log(`Running installer: ${msi}`);
     vscode.window.showInformationMessage(
-        "Installing DraftModel.Loader. A UAC prompt may appear.",
+        "Installing SimpleModelServer. A UAC prompt may appear.",
     );
 
     const code = await runMsiexec(["/i", msi, "/qn", "/norestart"]);
     if (code !== 0) {
-        logDraft(`Installer exited with code ${code}.`);
+        log(`Installer exited with code ${code}.`);
         vscode.window.showErrorMessage(
-            `DraftModel.Loader installer failed (msiexec exit code ${code}).`,
+            `SimpleModelServer installer failed (msiexec exit code ${code}).`,
         );
         return;
     }
 
-    cachedDraftExePath = draftLoaderExePath(context);
-    usingWindowsService = true;
-    logDraft("DraftModelLoader service installed and started.");
+    cachedSimpleModelServerExePath = simpleModelServerExePath(context);
+    usingSimpleModelServerWindowsService = true;
+    log("SimpleModelServer service installed and started.");
     vscode.window.showInformationMessage(
-        "DraftModel.Loader installed as Windows service and started. It will now start automatically at login.",
+        "SimpleModelServer installed as Windows service and started. It will now start automatically at login.",
     );
 
     // Mirror maybePromptForServiceInstall's chaining: once both services are up (this one just
@@ -1842,23 +1842,23 @@ async function installDraftModelService(context: vscode.ExtensionContext) {
 }
 
 /**
- * Stops and removes the DraftModelLoader Windows service by running the bundled WiX MSI's
+ * Stops and removes the SimpleModelServer Windows service by running the bundled WiX MSI's
  * uninstall via msiexec (/x), mirroring uninstallTokenSaverService()'s approach of delegating
  * to the MSI rather than duplicating sc.exe stop/delete logic here.
  */
-async function uninstallDraftModelService(context?: vscode.ExtensionContext) {
-    if (!(await isServiceInstalled())) {
-        vscode.window.showInformationMessage("DraftModelLoader service is not installed.");
+async function uninstallSimpleModelServerService(context?: vscode.ExtensionContext) {
+    if (!(await isServiceInstalled(SIMPLEMODEL_SERVER_SERVICE_NAME))) {
+        vscode.window.showInformationMessage("SimpleModelServer service is not installed.");
         return;
     }
 
-    const msi = context ? draftModelMsiPath(context) : "";
+    const msi = context ? simpleModelServerMsiPath(context) : "";
     if (!msi || !fs.existsSync(msi)) {
         // Bundled MSI unavailable (e.g. extension installed without it, or context missing) —
         // fall back to sc.exe stop/delete so uninstall still works.
-        logDraft("Bundled MSI not found — falling back to sc.exe stop/delete.");
-        await runSc(["stop", DRAFT_SERVICE_NAME]);
-        const scCode = await runSc(["delete", DRAFT_SERVICE_NAME]);
+        log("Bundled MSI not found — falling back to sc.exe stop/delete.");
+        await runSc(["stop", SIMPLEMODEL_SERVER_SERVICE_NAME]);
+        const scCode = await runSc(["delete", SIMPLEMODEL_SERVER_SERVICE_NAME]);
         if (scCode !== 0) {
             vscode.window.showErrorMessage(
                 `sc.exe delete failed (code ${scCode}). Try running VS Code as Administrator.`,
@@ -1866,24 +1866,24 @@ async function uninstallDraftModelService(context?: vscode.ExtensionContext) {
             return;
         }
     } else {
-        logDraft(`Running uninstaller: ${msi}`);
+        log(`Running uninstaller: ${msi}`);
         vscode.window.showInformationMessage(
-            "Uninstalling DraftModel.Loader. A UAC prompt may appear.",
+            "Uninstalling SimpleModelServer. A UAC prompt may appear.",
         );
         const code = await runMsiexec(["/x", msi, "/qn", "/norestart"]);
         if (code !== 0) {
-            logDraft(`Uninstaller exited with code ${code}.`);
+            log(`Uninstaller exited with code ${code}.`);
             vscode.window.showErrorMessage(
-                `DraftModel.Loader uninstaller failed (msiexec exit code ${code}).`,
+                `SimpleModelServer uninstaller failed (msiexec exit code ${code}).`,
             );
             return;
         }
     }
 
-    usingWindowsService = false;
-    logDraft("DraftModelLoader service uninstalled.");
+    usingSimpleModelServerWindowsService = false;
+    log("SimpleModelServer service uninstalled.");
     vscode.window.showInformationMessage(
-        "DraftModel.Loader Windows service removed. The extension will manage it as a process instead.",
+        "SimpleModelServer Windows service removed. The extension will manage it as a process instead.",
     );
 
     // Reset the first-run install prompt's "already asked" flag so maybePromptForServiceInstall
@@ -1977,12 +1977,12 @@ async function installTokenSaverService(context: vscode.ExtensionContext) {
     );
 
     // Mirror maybePromptForServiceInstall's chaining: once both services are up (this one just
-    // finished, and DraftModel either doesn't ship a bundled MSI or is already installed), open
+    // finished, and SimpleModelServer either doesn't ship a bundled MSI or is already installed), open
     // INSTALL_PROMPT.md automatically so the user isn't left to discover that command separately
     // after running this one manually from the Command Palette.
-    const draftMsi = draftModelMsiPath(context);
-    const draftStillNeeded = fs.existsSync(draftMsi) && !(await isServiceInstalled());
-    if (!draftStillNeeded) {
+    const simpleModelServerMsi = simpleModelServerMsiPath(context);
+    const simpleModelServerStillNeeded = fs.existsSync(simpleModelServerMsi) && !(await isServiceInstalled());
+    if (!simpleModelServerStillNeeded) {
         await openInstallPrompt(context);
     }
 }
@@ -2032,7 +2032,7 @@ async function uninstallTokenSaverService(context?: vscode.ExtensionContext) {
         "TokenSaver.MCP Windows service removed. The extension will manage it as a process instead.",
     );
 
-    // See the matching comment in uninstallDraftModelService: reset the first-run prompt's
+    // See the matching comment in uninstallSimpleModelServerService: reset the first-run prompt's
     // "already asked" flag so maybePromptForServiceInstall offers again next activation, since
     // there's no reliable hook for "the VSIX was uninstalled" and this is the closest signal.
     if (context) {
