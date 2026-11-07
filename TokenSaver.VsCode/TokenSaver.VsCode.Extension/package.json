@@ -219,7 +219,7 @@
           "description": "Enable verbose logging in the TokenSaver output channel.",
           "order": 9
         },
-        "tokenSaver.draftModel.exePath": {
+        "tokenSaver.simpleModelServer.exePath": {
           "type": "string",
           "default": "",
           "description": "Absolute path to DraftModel.Loader.exe. Defaults to the location where the bundled MSI installs it (Program Files\\DraftModel\\DraftModel.Loader.exe, see build/wix/DraftModel.Setup).",
@@ -231,13 +231,13 @@
           "description": "Absolute path to TokenSaver.MCP.exe. Defaults to the location where the bundled MSI installs it (Program Files\\TokenSaver\\TokenSaver.MCP.exe, see src/Installers/TokenSaver.Setup).",
           "order": 10.5
         },
-        "tokenSaver.draftModel.healthUrl": {
+        "tokenSaver.simpleModelServer.healthUrl": {
           "type": "string",
           "default": "http://localhost:11435/health",
           "description": "Health check URL for DraftModel.Loader. Checked on startup and after any MCP response slower than 30 seconds.",
           "order": 11
         },
-        "tokenSaver.draftModel.startTimeout": {
+        "tokenSaver.simpleModelServer.startTimeout": {
           "type": "number",
           "default": 600,
           "description": "Seconds to wait for DraftModel.Loader to become reachable after launch. First run requires downloading base models which can take several minutes.",

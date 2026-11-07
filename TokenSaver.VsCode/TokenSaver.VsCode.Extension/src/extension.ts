@@ -195,8 +195,8 @@ function migrateLegacySettings() {
     const keys = [
         "autostart", "server.port", "server.startTimeout", "server.idleTimeout",
         "dotnet.command", "dotnet.projectPath", "notifications.enabled", "notifications.level",
-        "verboseLogging", "draftModel.exePath", "mcp.exePath", "draftModel.healthUrl",
-        "draftModel.startTimeout", "autoCodeHelper.enabled", "autoInstallPrompt",
+        "verboseLogging", "simpleModelServer.exePath", "mcp.exePath", "simpleModelServer.healthUrl",
+        "simpleModelServer.startTimeout", "autoCodeHelper.enabled", "autoInstallPrompt",
     ];
     for (const key of keys) {
         const oldInspect = oldCfg.inspect(key);
@@ -421,7 +421,7 @@ async function maybePromptForServiceInstall(context: vscode.ExtensionContext) {
  *   1. Install DraftModelLoader service (skipped if already installed).
  *   2. Wait for DraftModel.Loader to report healthy on its /health endpoint — this can take
  *      several minutes on first run (base model download/warmup), so it uses
- *      tokenSaver.draftModel.startTimeout (default 600s), not the short server-restart-style
+ *      tokenSaver.simpleModelServer.startTimeout (default 600s), not the short server-restart-style
  *      timeout used elsewhere.
  *   3. Install TokenSaverMCP service (skipped if already installed).
  *   4. Wait for TokenSaver.MCP to respond on /mcp (tokenSaver.server.startTimeout, default 30s
@@ -467,8 +467,8 @@ async function runFullSetup(context: vscode.ExtensionContext): Promise<void> {
     // than always making the user wait the full 600s (or manually restart it themselves) for a
     // condition a restart reliably fixes.
     const cfg = vscode.workspace.getConfiguration("tokenSaver");
-    const healthUrl = cfg.get<string>("draftModel.healthUrl", "http://localhost:11435/health");
-    const draftTimeoutSec = cfg.get<number>("draftModel.startTimeout", 600);
+    const healthUrl = cfg.get<string>("simpleModelServer.healthUrl", "http://localhost:11435/health");
+    const draftTimeoutSec = cfg.get<number>("simpleModelServer.startTimeout", 600);
     logDraft(`Full setup: waiting up to ${draftTimeoutSec}s for DraftModel.Loader to report healthy...`);
     vscode.window.showInformationMessage(
         "TokenSaver setup: waiting for DraftModel.Loader to finish starting (first run can take several minutes while models download/warm up)...",
@@ -742,7 +742,7 @@ process.on("SIGINT", () => {
  */
 function draftLoaderExePath(context: vscode.ExtensionContext): string {
     const cfg = vscode.workspace.getConfiguration("tokenSaver");
-    const override = cfg.get<string>("draftModel.exePath", "");
+    const override = cfg.get<string>("simpleModelServer.exePath", "");
     if (override) return override;
     const programFiles = process.env["ProgramFiles"] ?? "C:\\Program Files";
     return path.join(programFiles, "DraftModel", "DraftModel.Loader.exe");
@@ -767,7 +767,7 @@ function draftModelMsiPath(context: vscode.ExtensionContext): string {
 async function startDraftModel(context: vscode.ExtensionContext) {
     // ── Service mode ────────────────────────────────────────────────────────
     const cfg0 = vscode.workspace.getConfiguration("tokenSaver");
-    const healthUrl0 = cfg0.get<string>("draftModel.healthUrl", "http://localhost:11435/health");
+    const healthUrl0 = cfg0.get<string>("simpleModelServer.healthUrl", "http://localhost:11435/health");
     const port0 = parseInt(new URL(healthUrl0).port, 10);
 
     if (await isServiceInstalled(DRAFT_SERVICE_NAME)) {
@@ -777,7 +777,7 @@ async function startDraftModel(context: vscode.ExtensionContext) {
             logDraft("Starting DraftModelLoader service...");
             await runSc(["start", DRAFT_SERVICE_NAME]);
         }
-        const timeoutSec0 = cfg0.get<number>("draftModel.startTimeout", 120);
+        const timeoutSec0 = cfg0.get<number>("simpleModelServer.startTimeout", 120);
         try { await waitForPortOpen("127.0.0.1", port0, timeoutSec0); }
         catch { logDraft("DraftModel service did not become reachable in time."); }
         await checkAndHealDraftModel(healthUrl0, context);
@@ -797,10 +797,10 @@ async function startDraftModel(context: vscode.ExtensionContext) {
 
     const cfg = vscode.workspace.getConfiguration("tokenSaver");
     const healthUrl = cfg.get<string>(
-        "draftModel.healthUrl",
+        "simpleModelServer.healthUrl",
         "http://localhost:11435/health",
     );
-    const timeoutSec = cfg.get<number>("draftModel.startTimeout", 120);
+    const timeoutSec = cfg.get<number>("simpleModelServer.startTimeout", 120);
     const exe = draftLoaderExePath(context);
 
     // If something is already listening at the health URL, adopt it
@@ -944,7 +944,7 @@ export async function checkAndHealDraftModel(
 
 async function fetchHealthOk(healthUrl: string): Promise<boolean> {
     const cfg = vscode.workspace.getConfiguration("tokenSaver");
-    const timeoutMs = cfg.get<number>("draftModel.startTimeout", 120) * 1000;
+    const timeoutMs = cfg.get<number>("simpleModelServer.startTimeout", 120) * 1000;
     try {
         const res = await fetch(healthUrl, {
             signal: AbortSignal.timeout(timeoutMs),
@@ -1583,7 +1583,7 @@ export async function withSlowResponseWatch<T>(
 ): Promise<T> {
     const cfg = vscode.workspace.getConfiguration("tokenSaver");
     const healthUrl = cfg.get<string>(
-        "draftModel.healthUrl",
+        "simpleModelServer.healthUrl",
         "http://localhost:11435/health",
     );
 
@@ -1658,7 +1658,7 @@ function showStatusInLog() {
             : `DraftModel.Loader process running: ${draftProcess !== null}`,
     );
     channelTokenSaver.appendLine(
-        `DraftModel health URL: ${cfg.get<string>("draftModel.healthUrl", "http://localhost:11435/health")}`,
+        `DraftModel health URL: ${cfg.get<string>("simpleModelServer.healthUrl", "http://localhost:11435/health")}`,
     );
     channelTokenSaver.appendLine("==========================");
 }

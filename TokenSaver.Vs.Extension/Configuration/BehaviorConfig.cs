@@ -55,8 +55,8 @@ public sealed record ExtensionBehaviorConfig
     [JsonPropertyName("server")]
     public ExtensionServerConfig? Server { get; init; }
 
-    [JsonPropertyName("draftModel")]
-    public ExtensionDraftModelConfig? DraftModel { get; init; }
+    [JsonPropertyName("simpleModelServer")]
+    public ExtensionSimpleModelServerConfig? SimpleModelServer { get; init; }
 }
 
 public sealed record ExtensionServerConfig
@@ -71,7 +71,7 @@ public sealed record ExtensionServerConfig
     public int? IdleTimeout { get; init; }
 }
 
-public sealed record ExtensionDraftModelConfig
+public sealed record ExtensionSimpleModelServerConfig
 {
     [JsonPropertyName("exePath")]
     public string? ExePath { get; init; }
@@ -114,11 +114,11 @@ public static class BehaviorConfigManager
                 StartTimeout = global?.Server?.StartTimeout ?? 30,
                 IdleTimeout = global?.Server?.IdleTimeout ?? 0,
             },
-            DraftModel = new ExtensionDraftModelConfig
+            SimpleModelServer = new ExtensionSimpleModelServerConfig
             {
-                ExePath = global?.DraftModel?.ExePath ?? "",
-                HealthUrl = global?.DraftModel?.HealthUrl ?? "http://localhost:11435/health",
-                StartTimeout = global?.DraftModel?.StartTimeout ?? 600,
+                ExePath = global?.SimpleModelServer?.ExePath ?? "",
+                HealthUrl = global?.SimpleModelServer?.HealthUrl ?? "http://localhost:11435/health",
+                StartTimeout = global?.SimpleModelServer?.StartTimeout ?? 600,
             },
         };
     }

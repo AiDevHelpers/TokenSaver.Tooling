@@ -251,7 +251,7 @@ export interface IExtensionSettings {
   server?: IExtensionServerSettings;
   dotnet?: IExtensionDotnetSettings;
   notifications?: IExtensionNotificationsSettings;
-  draftModel?: IExtensionDraftModelSettings;
+  simpleModelServer?: IExtensionSimpleModelServerSettings;
 }
 
 /** tokenSaver.server.* */
@@ -273,8 +273,8 @@ export interface IExtensionNotificationsSettings {
   level?: "all" | "errors";
 }
 
-/** tokenSaver.draftModel.* */
-export interface IExtensionDraftModelSettings {
+/** tokenSaver.simpleModelServer.* */
+export interface IExtensionSimpleModelServerSettings {
   exePath?: string;
   healthUrl?: string;
   startTimeout?: number;

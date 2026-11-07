@@ -20,9 +20,9 @@ public partial class TokenSaverOptionsControl : UserControl
         PortTextBox.Text = (settings.Server?.Port ?? 11436).ToString(CultureInfo.InvariantCulture);
         StartTimeoutTextBox.Text = (settings.Server?.StartTimeout ?? 30).ToString(CultureInfo.InvariantCulture);
         IdleTimeoutTextBox.Text = (settings.Server?.IdleTimeout ?? 0).ToString(CultureInfo.InvariantCulture);
-        DraftModelExePathTextBox.Text = settings.DraftModel?.ExePath ?? "";
-        DraftModelHealthUrlTextBox.Text = settings.DraftModel?.HealthUrl ?? "http://localhost:11435/health";
-        DraftModelStartTimeoutTextBox.Text = (settings.DraftModel?.StartTimeout ?? 600).ToString(CultureInfo.InvariantCulture);
+        DraftModelExePathTextBox.Text = settings.SimpleModelServer?.ExePath ?? "";
+        DraftModelHealthUrlTextBox.Text = settings.SimpleModelServer?.HealthUrl ?? "http://localhost:11435/health";
+        DraftModelStartTimeoutTextBox.Text = (settings.SimpleModelServer?.StartTimeout ?? 600).ToString(CultureInfo.InvariantCulture);
         StatusTextBlock.Text = string.Empty;
     }
 
@@ -50,7 +50,7 @@ public partial class TokenSaverOptionsControl : UserControl
                 StartTimeout = startTimeout,
                 IdleTimeout = idleTimeout,
             },
-            DraftModel = new ExtensionDraftModelConfig
+            SimpleModelServer = new ExtensionSimpleModelServerConfig
             {
                 ExePath = DraftModelExePathTextBox.Text.Trim(),
                 HealthUrl = DraftModelHealthUrlTextBox.Text.Trim(),

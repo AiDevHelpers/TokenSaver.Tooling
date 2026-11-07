@@ -85,7 +85,7 @@ export async function verifyMcpServer(
 /**
  * Polls a health endpoint and checks if it returns 200 "ok" or 503 "degraded"
  */
-export async function isDraftModelHealthy(
+export async function isSimpleModelServerHealthy(
   healthUrl: string,
   timeoutMs: number = 30000
 ): Promise<boolean> {
@@ -131,7 +131,7 @@ export async function waitForHealthOk(
 ): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (await isDraftModelHealthy(healthUrl, 2000)) {
+    if (await isSimpleModelServerHealthy(healthUrl, 2000)) {
       return true;
     }
     await new Promise((r) => setTimeout(r, 2000));
