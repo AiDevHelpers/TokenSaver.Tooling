@@ -6,7 +6,7 @@
   "compilationOptions": {},
   "targets": {
     ".NETCoreApp,Version=v10.0": {
-      "TokenSaver.OllamaIntegration.Tests/1.0.51-alpha-g7c1b6df349": {
+      "TokenSaver.OllamaIntegration.Tests/1.0.53-alpha-g82fb731777": {
         "dependencies": {
           "Microsoft.Extensions.Logging.Abstractions": "10.0.9",
           "Microsoft.Extensions.Options": "10.0.9",
@@ -724,7 +724,7 @@
         "runtime": {
           "TokenSaver.Common.Contracts.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -736,7 +736,7 @@
         "runtime": {
           "TokenSaver.Common.Core.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -747,7 +747,7 @@
         "runtime": {
           "TokenSaver.Common.Models.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -760,7 +760,7 @@
         "runtime": {
           "TokenSaver.ContextHelper.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -773,7 +773,7 @@
         "runtime": {
           "TokenSaver.Database.Context.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -789,14 +789,14 @@
         "runtime": {
           "TokenSaver.OllamaIntegration.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       }
     }
   },
   "libraries": {
-    "TokenSaver.OllamaIntegration.Tests/1.0.51-alpha-g7c1b6df349": {
+    "TokenSaver.OllamaIntegration.Tests/1.0.53-alpha-g82fb731777": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

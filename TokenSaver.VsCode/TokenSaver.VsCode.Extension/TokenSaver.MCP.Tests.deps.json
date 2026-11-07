@@ -6,7 +6,7 @@
   "compilationOptions": {},
   "targets": {
     ".NETCoreApp,Version=v10.0": {
-      "TokenSaver.MCP.Tests/1.0.51-alpha-g7c1b6df349": {
+      "TokenSaver.MCP.Tests/1.0.53-alpha-g82fb731777": {
         "dependencies": {
           "Microsoft.AspNetCore.TestHost": "10.0.9",
           "Microsoft.NET.Test.Sdk": "18.7.0",
@@ -927,6 +927,23 @@
           }
         }
       },
+      "TokenSaver.Common.Logging/1.0.1-alpha-g85d00851f4": {
+        "dependencies": {
+          "Serilog": "4.4.0",
+          "Serilog.Extensions.Hosting": "10.0.0",
+          "Serilog.Extensions.Logging": "10.0.0",
+          "Serilog.Sinks.Console": "6.1.1",
+          "Serilog.Sinks.EventLog": "4.0.0",
+          "Serilog.Sinks.File": "7.0.0"
+        },
+        "runtime": {
+          "lib/net10.0/TokenSaver.Common.Logging.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.1.34256",
+            "localPath": "TokenSaver.Common.Logging.dll"
+          }
+        }
+      },
       "xunit/2.9.3": {
         "dependencies": {
           "xunit.assert": "2.9.3",
@@ -988,7 +1005,7 @@
         "runtime": {
           "TokenSaver.AgentHelpers.Anthropic.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -996,7 +1013,7 @@
         "runtime": {
           "TokenSaver.AgentHelpers.Core.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -1007,7 +1024,7 @@
         "runtime": {
           "TokenSaver.AgentHelpers.DeepSeek.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -1018,7 +1035,7 @@
         "runtime": {
           "TokenSaver.AgentHelpers.OpenSource.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -1029,7 +1046,7 @@
         "runtime": {
           "TokenSaver.AgentHelpers.Qwen.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -1047,7 +1064,7 @@
         "runtime": {
           "TokenSaver.CodeHelper.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -1058,7 +1075,7 @@
         "runtime": {
           "TokenSaver.Common.Contracts.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -1069,7 +1086,7 @@
         "runtime": {
           "TokenSaver.Common.Core.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -1080,23 +1097,7 @@
         "runtime": {
           "TokenSaver.Common.Installation.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
-          }
-        }
-      },
-      "TokenSaver.Common.Logging/1.0.0": {
-        "dependencies": {
-          "Serilog": "4.4.0",
-          "Serilog.Extensions.Hosting": "10.0.0",
-          "Serilog.Extensions.Logging": "10.0.0",
-          "Serilog.Sinks.Console": "6.1.1",
-          "Serilog.Sinks.EventLog": "4.0.0",
-          "Serilog.Sinks.File": "7.0.0"
-        },
-        "runtime": {
-          "TokenSaver.Common.Logging.dll": {
-            "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.1.34256"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -1107,7 +1108,7 @@
         "runtime": {
           "TokenSaver.Common.Models.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -1119,7 +1120,7 @@
         "runtime": {
           "TokenSaver.Config.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -1127,7 +1128,7 @@
         "runtime": {
           "TokenSaver.ContextHelper.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -1140,7 +1141,7 @@
         "runtime": {
           "TokenSaver.Database.Context.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -1155,7 +1156,7 @@
         "runtime": {
           "TokenSaver.Docs.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -1163,7 +1164,7 @@
         "runtime": {
           "TokenSaver.LanguageHelpers.Core.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -1175,7 +1176,7 @@
         "runtime": {
           "TokenSaver.LanguageHelpers.CSharp.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -1186,7 +1187,7 @@
         "runtime": {
           "TokenSaver.LanguageHelpers.PowerShell.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -1197,7 +1198,7 @@
         "runtime": {
           "TokenSaver.LanguageHelpers.Python.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -1213,7 +1214,7 @@
           "TokenSaver.CodeHelper": "1.0.0",
           "TokenSaver.Common.Core": "1.0.0",
           "TokenSaver.Common.Installation": "1.0.0",
-          "TokenSaver.Common.Logging": "1.0.0",
+          "TokenSaver.Common.Logging": "1.0.1-alpha-g85d00851f4",
           "TokenSaver.Common.Models": "1.0.0",
           "TokenSaver.Config": "1.0.0",
           "TokenSaver.ContextHelper": "1.0.0",
@@ -1229,7 +1230,7 @@
         "runtime": {
           "TokenSaver.MCP.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -1242,7 +1243,7 @@
         "runtime": {
           "TokenSaver.OllamaIntegration.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -1255,7 +1256,7 @@
         "runtime": {
           "TokenSaver.OllamaIntegration.Tests.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -1269,7 +1270,7 @@
         "runtime": {
           "TokenSaver.TokenEconomy.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -1284,7 +1285,7 @@
         "runtime": {
           "TokenSaver.TokenEconomy.Tests.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -1296,7 +1297,7 @@
         "runtime": {
           "TokenSaver.Utilities.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -1309,7 +1310,7 @@
         "runtime": {
           "TokenSaver.Utilities.Tests.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       },
@@ -1321,14 +1322,14 @@
         "runtime": {
           "TokenSaver.WslControl.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.51.31771"
+            "fileVersion": "1.0.53.33531"
           }
         }
       }
     }
   },
   "libraries": {
-    "TokenSaver.MCP.Tests/1.0.51-alpha-g7c1b6df349": {
+    "TokenSaver.MCP.Tests/1.0.53-alpha-g82fb731777": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
@@ -1578,6 +1579,13 @@
       "path": "system.serviceprocess.servicecontroller/10.0.9",
       "hashPath": "system.serviceprocess.servicecontroller.10.0.9.nupkg.sha512"
     },
+    "TokenSaver.Common.Logging/1.0.1-alpha-g85d00851f4": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-KElOGDot7u0saiiXnAwOzL0zW6v3/mPE+SWTE+9DNx+KNzYFtFJwZUBudi6hlQtr7RhjZ+vSitd4IOiQsybQxg==",
+      "path": "tokensaver.common.logging/1.0.1-alpha-g85d00851f4",
+      "hashPath": "tokensaver.common.logging.1.0.1-alpha-g85d00851f4.nupkg.sha512"
+    },
     "xunit/2.9.3": {
       "type": "package",
       "serviceable": true,
@@ -1661,11 +1669,6 @@
       "sha512": ""
     },
     "TokenSaver.Common.Installation/1.0.0": {
-      "type": "project",
-      "serviceable": false,
-      "sha512": ""
-    },
-    "TokenSaver.Common.Logging/1.0.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
