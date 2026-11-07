@@ -19,9 +19,6 @@
     "package": "vsce package --out tokensaver.vsix --no-dependencies",
     "package:vsix": "pwsh -File ..\\..\\.\\build\\scripts\\build-vsix.ps1"
   },
-  "dependencies": {
-    "@tokensaver/draftmodel-provider": "file:../../TokenSaver.Common.DraftModelProvider.TypeScript"
-  },
   "devDependencies": {
     "@types/node": "^26.0.1",
     "@types/vscode": "^1.125.0",
@@ -158,12 +155,6 @@
       {
         "id": "TokenSaver",
         "label": "TokenSaver"
-      }
-    ],
-    "languageModelChatProviders": [
-      {
-        "vendor": "draftmodel",
-        "displayName": "DraftModel"
       }
     ],
     "configuration": {
