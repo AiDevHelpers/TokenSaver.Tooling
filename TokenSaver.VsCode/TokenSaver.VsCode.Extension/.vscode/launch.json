@@ -29,7 +29,7 @@
       // Full rebuild+publish+install+launch, but as a REAL installed extension rather than
       // an Extension Development Host: preLaunchTask runs launch-vscode-with-installed-
       // extension, which itself depends on rebuild-publish-install-vsix (full dotnet publish
-      // of TokenSaver.MCP/DraftModel.Loader, npm build, vsce package, and
+      // of TokenSaver.MCP/SimpleModelServer, npm build, vsce package, and
       // `code --install-extension --force`) and then opens a plain `code --new-window`.
       //
       // No debugger attaches to that new window's extension host — this configuration exists

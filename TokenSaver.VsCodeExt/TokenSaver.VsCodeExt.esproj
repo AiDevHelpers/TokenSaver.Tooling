@@ -46,11 +46,11 @@
       just `npm run build`/tsc, so a plain VS "Build Solution"/"Build All"/Rebuild produces
       build/dist/tokensaver.vsix (both MSIs bundled, no raw exes) without a separate manual
       step. It calls build-vsix.ps1, which does its own nested `dotnet publish` of
-      TokenSaver.MCP and DraftModel.Loader plus two WiX MSI builds.
+      TokenSaver.MCP and SimpleModelServer plus two WiX MSI builds.
 
       IMPORTANT — this only works because TokenSaverMCP.slnx gives this project explicit
       <BuildDependency> entries on TokenSaver/TokenSaver.MCP/TokenSaver.MCP.csproj and
-      DraftModel/DraftModel.Loader/DraftModel.Loader.csproj (see the .slnx's
+      SimpleModelServer/SimpleModelServer/SimpleModelServer.csproj (see the .slnx's
       TokenSaver.VsCodeExt.esproj entry). Without that, VS builds every project in the
       solution in parallel by default, and build-vsix.ps1's nested `dotnet publish` of
       TokenSaver.MCP (which itself depends on TokenSaver.Docs) would run CONCURRENTLY with
@@ -61,7 +61,7 @@
       access the file ... because it is being used by another process." as the causal error,
       and it isn't safe to just retry past — it's inherent to two builds of the same project
       overlapping. The BuildDependency entries force VS to fully finish building
-      TokenSaver.MCP.csproj/DraftModel.Loader.csproj (and everything they depend on,
+      TokenSaver.MCP.csproj/SimpleModelServer.csproj (and everything they depend on,
       including TokenSaver.Docs) before this project's build starts, so by the time
       build-vsix.ps1's own `dotnet publish` runs, nothing else in the solution build is still
       touching those projects' obj/ output. If you ever see the
@@ -76,7 +76,7 @@
       .esproj, which runs the identical pipeline (kept in sync with BuildCommand below).
 
       -NoBuild lets `dotnet build|publish -p:SkipDotnetPublish=true` skip the (slow) nested
-      dotnet publish of TokenSaver.MCP/DraftModel.Loader and the WiX MSI rebuilds, and just
+      dotnet publish of TokenSaver.MCP/SimpleModelServer and the WiX MSI rebuilds, and just
       repackage the VSIX from whatever is already in bin/ — useful for iterating on the
       TypeScript/package.json side only without waiting on two MSI builds every time.
     -->

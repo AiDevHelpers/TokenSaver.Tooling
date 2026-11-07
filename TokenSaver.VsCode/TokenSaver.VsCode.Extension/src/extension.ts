@@ -649,7 +649,7 @@ interface McpHealthReport {
  * above already covers) so the fault-tracking and self-test checks built into that endpoint —
  * see docs/tokensaver-mcp-health-contract.md — actually get consulted on startup instead of
  * only ever running when something else happens to poll /health manually. Unlike checkMcpHealth,
- * this never restarts the server: /health can legitimately report Degraded (draftmodel not
+ * this never restarts the server: /health can legitimately report Degraded (simpleModelServer not
  * warmed up yet, self-test wiring hiccup, etc.) without the process itself being broken, so this
  * only logs and notifies — restarting on every Degraded would fight the same "restart-flapping"
  * problem checkAndHealSimpleModelServer's health-based restart deliberately avoids for the SimpleModelServer

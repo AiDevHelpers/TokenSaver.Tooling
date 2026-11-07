@@ -51,7 +51,7 @@
     },
     {
       // Full rebuild+publish+install: runs scripts/build-vsix.ps1 with no flags, so it
-      // does the whole pipeline — dotnet publish of TokenSaver.MCP and DraftModel.Loader,
+      // does the whole pipeline — dotnet publish of TokenSaver.MCP and SimpleModelServer,
       // npm install/build, vsce package, and (since -NoInstall is NOT passed here) uninstalls
       // any existing tokensaver-vscode extension and installs the freshly built VSIX. This
       // is the same script the .esproj's PublishCommand calls, just invoked directly with

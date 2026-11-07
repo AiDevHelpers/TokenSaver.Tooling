@@ -20,8 +20,8 @@ they want, when more than one applies).**
 
 **Order of operations: run "Step 0: Check what's already installed" first. Skip any install step
 whose check already passes — don't reinstall or restart something that's already hot. For
-whatever isn't already confirmed installed/hot, do "Installing DraftModel.Loader and
-TokenSaver.MCP" below IN ORDER — DraftModel must be installed, started, and confirmed hot before
+whatever isn't already confirmed installed/hot, do "Installing SimpleModelServer and
+TokenSaver.MCP" below IN ORDER — SimpleModelServer must be installed, started, and confirmed hot before
 you touch TokenSaver.MCP or any client config. Then read the "Values you need" section, then read
 ONLY the `install-clients/<provider>.md` file for the provider the user actually wants (see table
 below), follow its steps, then do the client-connection verification, then run the deeper "Verify
@@ -30,30 +30,30 @@ matching one is needed.**
 
 ## Step 0: Check what's already installed
 
-Run these checks before doing anything else. Both DraftModel.Loader and TokenSaver.MCP are
+Run these checks before doing anything else. Both SimpleModelServer and TokenSaver.MCP are
 commonly already installed as Windows services on this machine — don't blindly re-run installers
 or restart services that are already up and hot.
 
 1. Are the services installed?
 
    ```powershell
-   sc query DraftModelLoader
+   sc query SimpleModelServer
    sc query TokenSaverMCP
    ```
 
    If a service is missing, its "Installing ..." step below still needs to run. If it's present,
    note its state (`RUNNING` / `STOPPED`) and move on — don't reinstall it.
-2. If `DraftModelLoader` is `RUNNING`, check whether it's actually hot yet (running isn't the
-   same as hot — see step 2 under "Installing DraftModel.Loader" for why):
+2. If `SimpleModelServer` is `RUNNING`, check whether it's actually hot yet (running isn't the
+   same as hot — see step 2 under "Installing SimpleModelServer" for why):
 
    ```bash
    curl http://localhost:11435/health
    curl http://localhost:11435/api/capacity
    ```
 
-   If `/api/capacity` already reports the draft/main/embedding models loaded, DraftModel is hot —
+   If `/api/capacity` already reports the draft/main/embedding models loaded, SimpleModelServer is hot —
    skip straight to checking TokenSaver.MCP next. If it's stopped, start it
-   (`sc start DraftModelLoader`) and wait for hot per step 2 below before touching TokenSaver.MCP.
+   (`sc start SimpleModelServer`) and wait for hot per step 2 below before touching TokenSaver.MCP.
 3. If `TokenSaverMCP` is `RUNNING`, confirm it's actually reachable:
 
    ```bash
@@ -63,7 +63,7 @@ or restart services that are already up and hot.
    A non-error response means TokenSaver.MCP is already installed and up — skip "Install
    TokenSaver.MCP" below and go straight to "Values you need" / client config. If it's stopped,
    start it (`sc start TokenSaverMCP`) rather than reinstalling.
-4. Only fall through to the full "Installing DraftModel.Loader and TokenSaver.MCP" section below
+4. Only fall through to the full "Installing SimpleModelServer and TokenSaver.MCP" section below
    for whichever of the two is actually missing (not installed at all) per step 1.
 
 | Provider | File |
@@ -74,29 +74,29 @@ or restart services that are already up and hot.
 | Sixth AI | `install-clients/sixth-ai.md` |
 | Continue | `install-clients/continue.md` |
 
-## Installing DraftModel.Loader and TokenSaver.MCP
+## Installing SimpleModelServer and TokenSaver.MCP
 
 The VS Code extension no longer bundles raw `.exe` binaries — it bundles WiX **MSI**
 installers instead, and installs them via `msiexec` when you run its "Install ... as Windows
-Service" commands. **DraftModel.Loader must be installed, started, and confirmed hot before you
-install or configure TokenSaver.MCP** — TokenSaver.MCP's own tools route through DraftModel's
+Service" commands. **SimpleModelServer must be installed, started, and confirmed hot before you
+install or configure TokenSaver.MCP** — TokenSaver.MCP's own tools route through SimpleModelServer's
 router, so wiring up a client against TokenSaver first just gets you a client that connects but
-whose tool calls silently degrade or fail while DraftModel is still loading models. Do these in
+whose tool calls silently degrade or fail while SimpleModelServer is still loading models. Do these in
 order:
 
-### 1. Install DraftModel.Loader
+### 1. Install SimpleModelServer
 
-`Ctrl+Shift+P` → **"TokenSaver: Install DraftModel as Windows Service"** — runs the bundled
-`DraftModel-Setup.msi` via `msiexec /i ... /qn`, installing to
-`C:\Program Files\DraftModel\DraftModel.Loader.exe` and registering the `DraftModelLoader`
+`Ctrl+Shift+P` → **"TokenSaver: Install SimpleModelServer as Windows Service"** — runs the bundled
+`SimpleModelServer-Setup.msi` via `msiexec /i ... /qn`, installing to
+`C:\Program Files\SimpleModelServer\SimpleModelServer.Server.exe` and registering the `SimpleModelServer`
 Windows service. Shows a UAC prompt (service installation requires admin rights). If you'd
-rather install standalone outside VS Code: `msiexec /i "<path-to>\DraftModel-Setup.msi" /qn
+rather install standalone outside VS Code: `msiexec /i "<path-to>\SimpleModelServer-Setup.msi" /qn
 /norestart`.
 
 ### 2. Start the service and wait for it to be hot
 
 The service starts (and reports "running" to the SCM) almost immediately, but that is **not**
-the same as being ready — `DraftModelWorker` returns control to the SCM right away and does the
+the same as being ready — `SimpleModelServerWorker` returns control to the SCM right away and does the
 actual Ollama/model bring-up in the background, so a service that shows as "Running" can still
 be minutes away from being usable. Don't skip the wait:
 
@@ -115,17 +115,17 @@ be minutes away from being usable. Don't skip the wait:
    curl http://localhost:11435/api/capacity
    ```
 
-   Only treat DraftModel as hot once this reports the draft/main/embedding models as loaded. If
+   Only treat SimpleModelServer as hot once this reports the draft/main/embedding models as loaded. If
    it reports models still loading/pulling, keep polling — do not proceed to step 3 yet.
 3. Only after `/api/capacity` confirms models are loaded, move on to installing TokenSaver.MCP
    below.
 
-If you need to restart it later: `sc stop DraftModelLoader; sc start DraftModelLoader`, then
+If you need to restart it later: `sc stop SimpleModelServer; sc start SimpleModelServer`, then
 repeat the same `/health` → `/api/capacity` wait — a restart is not instantly hot either.
 
 ### 3. Install TokenSaver.MCP
 
-Only once DraftModel is confirmed hot: `Ctrl+Shift+P` → **"TokenSaver: Install TokenSaver.MCP
+Only once SimpleModelServer is confirmed hot: `Ctrl+Shift+P` → **"TokenSaver: Install TokenSaver.MCP
 as Windows Service"** — runs the bundled `TokenSaver-Setup.msi` via `msiexec /i ... /qn`,
 installing to `C:\Program Files\TokenSaver\TokenSaver.MCP.exe` and registering the
 `TokenSaverMCP` Windows service (auto-starts at login). Shows a UAC prompt. Standalone
@@ -139,14 +139,14 @@ To uninstall either service, use the matching "Uninstall ..." command, or
 **Important:** VS Code has no hook that runs extension code when a VSIX is uninstalled from the
 Extensions panel — there's no `onWillUninstall` equivalent, and `deactivate()` only fires on
 disable/reload, which is indistinguishable from a real uninstall. That means simply removing the
-TokenSaver extension leaves the `TokenSaverMCP` and `DraftModelLoader` Windows services fully
+TokenSaver extension leaves the `TokenSaverMCP` and `SimpleModelServer` Windows services fully
 installed and running (they'll keep auto-starting at login) — they're managed by Windows'
 Service Control Manager independently of the extension that installed them.
 
 If you want a full teardown, run these two commands **before** uninstalling the extension itself:
 
 - `Ctrl+Shift+P` → **"TokenSaver: Uninstall TokenSaver.MCP Windows Service"**
-- `Ctrl+Shift+P` → **"TokenSaver: Uninstall DraftModel Windows Service"**
+- `Ctrl+Shift+P` → **"TokenSaver: Uninstall SimpleModelServer Windows Service"**
 
 Only after both services report as uninstalled should you remove the extension from the
 Extensions panel. (These commands also reset the extension's internal "already asked about
@@ -190,17 +190,17 @@ Don't just assume the config was picked up:
 
 ## Verify install (deep — test the servers themselves, not just the client connection)
 
-The check above only proves a client *can reach* TokenSaver.MCP. It doesn't prove DraftModel is
+The check above only proves a client *can reach* TokenSaver.MCP. It doesn't prove SimpleModelServer is
 actually serving working completions, or that TokenSaver's individual tools (chat, code
 indexing, context building, file editing) work end-to-end. For that, use the two dedicated
 verification prompts, in order:
 
-1. `DraftModel/DraftModel.Loader/VERIFY_INSTALL.md` — tests DraftModel's router directly:
+1. `SimpleModelServer/SimpleModelServer/VERIFY_INSTALL.md` — tests SimpleModelServer's router directly:
    health/readiness, capacity, model listing, chat (streaming and non-streaming), the
    Ollama-native generate endpoint, and embeddings. Run this first — most TokenSaver.MCP tools
-   depend on DraftModel, so a DraftModel problem will otherwise look like a TokenSaver bug.
+   depend on SimpleModelServer, so a SimpleModelServer problem will otherwise look like a TokenSaver bug.
 2. `TokenSaver/TokenSaver.MCP/VERIFY_INSTALL.md` — tests TokenSaver.MCP's own surface: health,
-   the `Help` tool, `CleanAndChat` (which exercises the full client→MCP→DraftModel chain),
+   the `Help` tool, `CleanAndChat` (which exercises the full client→MCP→SimpleModelServer chain),
    endpoint listing, code indexing, context diagnostics/building, and a dry-run file edit.
 
 ## Why this file exists instead of a script doing it automatically
