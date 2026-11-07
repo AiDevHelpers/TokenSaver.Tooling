@@ -11,23 +11,23 @@ using TokenSaver.Vs.Extension.Services;
 namespace TokenSaver.Vs.Extension.Commands;
 
 /// <summary>
-/// Shared behavior for every DraftModel command: grab the active editor's selection (or whole
-/// document), build the action-specific prompt, stream DraftModel's response into an Output
+/// Shared behavior for every SimpleModelServer command: grab the active editor's selection (or whole
+/// document), build the action-specific prompt, stream SimpleModelServer's response into an Output
 /// Window channel. Visual Studio has no public SDK hook to register a custom Copilot model
 /// provider (unlike VS Code's languageModelChatProviders), so each Copilot-equivalent action gets
-/// its own command against DraftModel directly instead.
+/// its own command against SimpleModelServer directly instead.
 /// </summary>
-public abstract class DraftModelCommandBase : Command
+public abstract class SimpleModelServerCommandBase : Command
 {
-    private const string OutputChannelName = "DraftModel";
+    private const string OutputChannelName = "SimpleModelServer";
     private static readonly Uri DefaultBaseUrl = new("http://localhost:11435");
 
-    protected DraftModelCommandBase(VisualStudioExtensibility extensibility)
+    protected SimpleModelServerCommandBase(VisualStudioExtensibility extensibility)
         : base(extensibility)
     {
     }
 
-    protected abstract DraftModelAction Action { get; }
+    protected abstract SimpleModelServerAction Action { get; }
 
     public override async Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
     {
@@ -42,7 +42,7 @@ public abstract class DraftModelCommandBase : Command
         if (textView is null)
         {
             await this.Extensibility.Shell()
-                .ShowPromptAsync("DraftModel: no active editor.", PromptOptions.OK, cancellationToken)
+                .ShowPromptAsync("SimpleModelServer: no active editor.", PromptOptions.OK, cancellationToken)
                 .ConfigureAwait(false);
             return;
         }
@@ -54,22 +54,22 @@ public abstract class DraftModelCommandBase : Command
         if (string.IsNullOrWhiteSpace(code))
         {
             await this.Extensibility.Shell()
-                .ShowPromptAsync("DraftModel: nothing to send (empty document).", PromptOptions.OK, cancellationToken)
+                .ShowPromptAsync("SimpleModelServer: nothing to send (empty document).", PromptOptions.OK, cancellationToken)
                 .ConfigureAwait(false);
             return;
         }
 
         var languageId = Path.GetExtension(textView.FilePath)?.TrimStart('.');
-        var messages = DraftModelPromptBuilder.BuildMessages(this.Action, code, languageId);
+        var messages = SimpleModelServerPromptBuilder.BuildMessages(this.Action, code, languageId);
 
-        await outputChannel.WriteLineAsync($"--- DraftModel: {this.Action} ---").ConfigureAwait(false);
+        await outputChannel.WriteLineAsync($"--- SimpleModelServer: {this.Action} ---").ConfigureAwait(false);
 
-        using var client = new HttpDraftModelClient(DefaultBaseUrl);
+        using var client = new HttpSimpleModelServerClient(DefaultBaseUrl);
         var health = await client.CheckHealthAsync(cancellationToken).ConfigureAwait(false);
-        if (health.Status == DraftModelHealthStatus.Unreachable)
+        if (health.Status == SimpleModelServerHealthStatus.Unreachable)
         {
             await outputChannel.WriteLineAsync(
-                $"DraftModel is not reachable at {DefaultBaseUrl}. Start it via 'TokenSaver: Start TokenSaver MCP Server'.")
+                $"SimpleModelServer is not reachable at {DefaultBaseUrl}. Start it via 'TokenSaver: Start TokenSaver MCP Server'.")
                 .ConfigureAwait(false);
             return;
         }
@@ -88,7 +88,7 @@ public abstract class DraftModelCommandBase : Command
         }
         catch (Exception ex) when (ex is InvalidOperationException or System.Net.Http.HttpRequestException)
         {
-            await outputChannel.WriteLineAsync($"DraftModel request failed: {ex.Message}").ConfigureAwait(false);
+            await outputChannel.WriteLineAsync($"SimpleModelServer request failed: {ex.Message}").ConfigureAwait(false);
         }
     }
 }

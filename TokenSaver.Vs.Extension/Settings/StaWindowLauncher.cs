@@ -28,7 +28,7 @@ internal static class StaWindowLauncher
 
     /// <summary>
     /// Shows a non-modal window and returns immediately — used for windows meant to stay open
-    /// alongside the editor (e.g. the DraftModel chat window) rather than block the caller.
+    /// alongside the editor (e.g. the SimpleModelServer chat window) rather than block the caller.
     /// The STA thread pumps its own <see cref="System.Windows.Threading.Dispatcher"/> until the
     /// window closes, then exits.
     /// </summary>

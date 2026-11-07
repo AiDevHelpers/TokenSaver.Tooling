@@ -20,9 +20,9 @@ public partial class TokenSaverOptionsControl : UserControl
         PortTextBox.Text = (settings.Server?.Port ?? 11436).ToString(CultureInfo.InvariantCulture);
         StartTimeoutTextBox.Text = (settings.Server?.StartTimeout ?? 30).ToString(CultureInfo.InvariantCulture);
         IdleTimeoutTextBox.Text = (settings.Server?.IdleTimeout ?? 0).ToString(CultureInfo.InvariantCulture);
-        DraftModelExePathTextBox.Text = settings.SimpleModelServer?.ExePath ?? "";
-        DraftModelHealthUrlTextBox.Text = settings.SimpleModelServer?.HealthUrl ?? "http://localhost:11435/health";
-        DraftModelStartTimeoutTextBox.Text = (settings.SimpleModelServer?.StartTimeout ?? 600).ToString(CultureInfo.InvariantCulture);
+        SimpleModelServerExePathTextBox.Text = settings.SimpleModelServer?.ExePath ?? "";
+        SimpleModelServerHealthUrlTextBox.Text = settings.SimpleModelServer?.HealthUrl ?? "http://localhost:11435/health";
+        SimpleModelServerStartTimeoutTextBox.Text = (settings.SimpleModelServer?.StartTimeout ?? 600).ToString(CultureInfo.InvariantCulture);
         StatusTextBlock.Text = string.Empty;
     }
 
@@ -31,7 +31,7 @@ public partial class TokenSaverOptionsControl : UserControl
         if (!TryParseInt(PortTextBox.Text, out var port) ||
             !TryParseInt(StartTimeoutTextBox.Text, out var startTimeout) ||
             !TryParseInt(IdleTimeoutTextBox.Text, out var idleTimeout) ||
-            !TryParseInt(DraftModelStartTimeoutTextBox.Text, out var draftModelStartTimeout))
+            !TryParseInt(SimpleModelServerStartTimeoutTextBox.Text, out var simpleModelServerStartTimeout))
         {
             error = "Timeouts and the port must be whole numbers.";
             StatusTextBlock.Text = error;
@@ -52,9 +52,9 @@ public partial class TokenSaverOptionsControl : UserControl
             },
             SimpleModelServer = new ExtensionSimpleModelServerConfig
             {
-                ExePath = DraftModelExePathTextBox.Text.Trim(),
-                HealthUrl = DraftModelHealthUrlTextBox.Text.Trim(),
-                StartTimeout = draftModelStartTimeout,
+                ExePath = SimpleModelServerExePathTextBox.Text.Trim(),
+                HealthUrl = SimpleModelServerHealthUrlTextBox.Text.Trim(),
+                StartTimeout = simpleModelServerStartTimeout,
             },
         };
         return true;

@@ -10,7 +10,7 @@ using Xunit;
 
 namespace TokenSaver.Vs.Extension.Tests.Services;
 
-public sealed class HttpDraftModelClientTests
+public sealed class HttpSimpleModelServerClientTests
 {
     private sealed class FakeHandler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
     {
@@ -19,10 +19,10 @@ public sealed class HttpDraftModelClientTests
             => Task.FromResult(respond(request));
     }
 
-    private static HttpDraftModelClient CreateClient(Func<HttpRequestMessage, HttpResponseMessage> respond)
+    private static HttpSimpleModelServerClient CreateClient(Func<HttpRequestMessage, HttpResponseMessage> respond)
     {
         var httpClient = new HttpClient(new FakeHandler(respond)) { BaseAddress = new Uri("http://localhost:11435") };
-        return new HttpDraftModelClient(httpClient, ownsHttpClient: true);
+        return new HttpSimpleModelServerClient(httpClient, ownsHttpClient: true);
     }
 
     private static HttpResponseMessage JsonResponse(string json, HttpStatusCode status = HttpStatusCode.OK) =>
@@ -33,7 +33,7 @@ public sealed class HttpDraftModelClientTests
     {
         using var client = CreateClient(_ => JsonResponse("""{"status":"warming_up"}"""));
         var health = await client.CheckHealthAsync();
-        Assert.Equal(DraftModelHealthStatus.WarmingUp, health.Status);
+        Assert.Equal(SimpleModelServerHealthStatus.WarmingUp, health.Status);
     }
 
     [Fact]
@@ -41,7 +41,7 @@ public sealed class HttpDraftModelClientTests
     {
         using var client = CreateClient(_ => throw new HttpRequestException("ECONNREFUSED"));
         var health = await client.CheckHealthAsync();
-        Assert.Equal(DraftModelHealthStatus.Unreachable, health.Status);
+        Assert.Equal(SimpleModelServerHealthStatus.Unreachable, health.Status);
     }
 
     [Fact]
@@ -83,7 +83,7 @@ public sealed class HttpDraftModelClientTests
         var deltas = new List<string>();
         var sawDone = false;
         await foreach (var chunk in client.StreamChatAsync(
-            [new DraftModelChatMessage(DraftModelChatRole.User, "hi")]))
+            [new SimpleModelServerChatMessage(SimpleModelServerChatRole.User, "hi")]))
         {
             if (chunk.ContentDelta.Length > 0) deltas.Add(chunk.ContentDelta);
             if (chunk.Done)
@@ -104,7 +104,7 @@ public sealed class HttpDraftModelClientTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
         {
-            await foreach (var _ in client.StreamChatAsync([new DraftModelChatMessage(DraftModelChatRole.User, "hi")]))
+            await foreach (var _ in client.StreamChatAsync([new SimpleModelServerChatMessage(SimpleModelServerChatRole.User, "hi")]))
             {
             }
         });
@@ -113,7 +113,7 @@ public sealed class HttpDraftModelClientTests
     [Fact]
     public void EstimateTokenCount_IsStableRoughEstimate()
     {
-        using var client = new HttpDraftModelClient(new Uri("http://localhost:11435"));
+        using var client = new HttpSimpleModelServerClient(new Uri("http://localhost:11435"));
         Assert.Equal(1, client.EstimateTokenCount(""));
         Assert.Equal(2, client.EstimateTokenCount(new string('a', 8)));
     }

@@ -28,7 +28,7 @@
             <TextBox x:Name="IdleTimeoutTextBox" Grid.Row="2" Grid.Column="1" Margin="0,2" />
         </Grid>
 
-        <TextBlock Text="DraftModel" FontWeight="Bold" Margin="0,12,0,4" />
+        <TextBlock Text="SimpleModelServer" FontWeight="Bold" Margin="0,12,0,4" />
         <Grid Margin="0,4">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="140" />
@@ -41,13 +41,13 @@
             </Grid.RowDefinitions>
 
             <TextBlock Grid.Row="0" Grid.Column="0" Text="Loader.exe path" VerticalAlignment="Center" />
-            <TextBox x:Name="DraftModelExePathTextBox" Grid.Row="0" Grid.Column="1" Margin="0,2" />
+            <TextBox x:Name="SimpleModelServerExePathTextBox" Grid.Row="0" Grid.Column="1" Margin="0,2" />
 
             <TextBlock Grid.Row="1" Grid.Column="0" Text="Health URL" VerticalAlignment="Center" />
-            <TextBox x:Name="DraftModelHealthUrlTextBox" Grid.Row="1" Grid.Column="1" Margin="0,2" />
+            <TextBox x:Name="SimpleModelServerHealthUrlTextBox" Grid.Row="1" Grid.Column="1" Margin="0,2" />
 
             <TextBlock Grid.Row="2" Grid.Column="0" Text="Start timeout (s)" VerticalAlignment="Center" />
-            <TextBox x:Name="DraftModelStartTimeoutTextBox" Grid.Row="2" Grid.Column="1" Margin="0,2" />
+            <TextBox x:Name="SimpleModelServerStartTimeoutTextBox" Grid.Row="2" Grid.Column="1" Margin="0,2" />
         </Grid>
 
         <TextBlock x:Name="StatusTextBlock" Foreground="Gray" Margin="0,10,0,0" TextWrapping="Wrap" />

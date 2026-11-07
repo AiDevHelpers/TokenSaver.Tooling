@@ -13,34 +13,34 @@ using System.Threading.Tasks;
 namespace TokenSaver.Vs.Extension.Services;
 
 /// <summary>
-/// Talks to DraftModel.Loader's OpenAI-compatible endpoints (/v1/models, /v1/chat/completions,
-/// /health). See DraftModel repo's docs/router-contract.md for the full HTTP contract.
+/// Talks to SimpleModelServer's OpenAI-compatible endpoints (/v1/models, /v1/chat/completions,
+/// /health). See SimpleModelServer repo's docs/router-contract.md for the full HTTP contract.
 /// </summary>
-public sealed class HttpDraftModelClient : IDraftModelClient, IDisposable
+public sealed class HttpSimpleModelServerClient : ISimpleModelServerClient, IDisposable
 {
-    private static readonly DraftModelHealthStatus[] KnownStatuses =
+    private static readonly SimpleModelServerHealthStatus[] KnownStatuses =
     [
-        DraftModelHealthStatus.Ok,
-        DraftModelHealthStatus.WarmingUp,
-        DraftModelHealthStatus.Degraded,
-        DraftModelHealthStatus.Unhealthy,
+        SimpleModelServerHealthStatus.Ok,
+        SimpleModelServerHealthStatus.WarmingUp,
+        SimpleModelServerHealthStatus.Degraded,
+        SimpleModelServerHealthStatus.Unhealthy,
     ];
 
     private readonly HttpClient _httpClient;
     private readonly bool _ownsHttpClient;
 
-    public HttpDraftModelClient(Uri baseUrl)
+    public HttpSimpleModelServerClient(Uri baseUrl)
         : this(new HttpClient { BaseAddress = baseUrl }, ownsHttpClient: true)
     {
     }
 
-    public HttpDraftModelClient(HttpClient httpClient, bool ownsHttpClient = false)
+    public HttpSimpleModelServerClient(HttpClient httpClient, bool ownsHttpClient = false)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _ownsHttpClient = ownsHttpClient;
     }
 
-    public async Task<DraftModelHealth> CheckHealthAsync(CancellationToken cancellationToken = default)
+    public async Task<SimpleModelServerHealth> CheckHealthAsync(CancellationToken cancellationToken = default)
     {
         try
         {
@@ -51,25 +51,25 @@ public sealed class HttpDraftModelClient : IDraftModelClient, IDisposable
 
             if (body?.Status is { } status && TryParseStatus(status, out var parsed))
             {
-                return new DraftModelHealth(parsed);
+                return new SimpleModelServerHealth(parsed);
             }
 
-            return new DraftModelHealth(response.IsSuccessStatusCode
-                ? DraftModelHealthStatus.Ok
-                : DraftModelHealthStatus.Unhealthy);
+            return new SimpleModelServerHealth(response.IsSuccessStatusCode
+                ? SimpleModelServerHealthStatus.Ok
+                : SimpleModelServerHealthStatus.Unhealthy);
         }
         catch
         {
-            return new DraftModelHealth(DraftModelHealthStatus.Unreachable);
+            return new SimpleModelServerHealth(SimpleModelServerHealthStatus.Unreachable);
         }
     }
 
-    public async Task<IReadOnlyList<DraftModelInfo>> ListModelsAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<SimpleModelServerInfo>> ListModelsAsync(CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.GetAsync("/v1/models", cancellationToken).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode)
         {
-            throw new InvalidOperationException($"DraftModel /v1/models returned {(int)response.StatusCode}");
+            throw new InvalidOperationException($"SimpleModelServer /v1/models returned {(int)response.StatusCode}");
         }
 
         var body = await response.Content
@@ -78,12 +78,12 @@ public sealed class HttpDraftModelClient : IDraftModelClient, IDisposable
 
         return (body?.Data ?? [])
             .Where(entry => !string.IsNullOrEmpty(entry.Id))
-            .Select(entry => new DraftModelInfo(entry.Id!, entry.Id!))
+            .Select(entry => new SimpleModelServerInfo(entry.Id!, entry.Id!))
             .ToList();
     }
 
-    public async IAsyncEnumerable<DraftModelChatChunk> StreamChatAsync(
-        IReadOnlyList<DraftModelChatMessage> messages,
+    public async IAsyncEnumerable<SimpleModelServerChatChunk> StreamChatAsync(
+        IReadOnlyList<SimpleModelServerChatMessage> messages,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var requestBody = new
@@ -104,7 +104,7 @@ public sealed class HttpDraftModelClient : IDraftModelClient, IDisposable
         if (!response.IsSuccessStatusCode)
         {
             throw new InvalidOperationException(
-                $"DraftModel /v1/chat/completions returned {(int)response.StatusCode}");
+                $"SimpleModelServer /v1/chat/completions returned {(int)response.StatusCode}");
         }
 
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
@@ -141,7 +141,7 @@ public sealed class HttpDraftModelClient : IDraftModelClient, IDisposable
         return Math.Max(1, (int)Math.Ceiling(text.Length / 4.0));
     }
 
-    private static DraftModelChatChunk? ParseSseFrame(List<string> lines)
+    private static SimpleModelServerChatChunk? ParseSseFrame(List<string> lines)
     {
         var dataLine = lines.Select(l => l.Trim()).FirstOrDefault(l => l.StartsWith("data:", StringComparison.Ordinal));
         if (dataLine is null) return null;
@@ -149,14 +149,14 @@ public sealed class HttpDraftModelClient : IDraftModelClient, IDisposable
         var payload = dataLine["data:".Length..].Trim();
         if (payload == "[DONE]")
         {
-            return new DraftModelChatChunk(string.Empty, Done: true);
+            return new SimpleModelServerChatChunk(string.Empty, Done: true);
         }
 
         try
         {
             var parsed = JsonSerializer.Deserialize<ChatCompletionChunk>(payload);
             var choice = parsed?.Choices?.FirstOrDefault();
-            return new DraftModelChatChunk(
+            return new SimpleModelServerChatChunk(
                 choice?.Delta?.Content ?? string.Empty,
                 Done: choice?.FinishReason is not null);
         }
@@ -166,14 +166,14 @@ public sealed class HttpDraftModelClient : IDraftModelClient, IDisposable
         }
     }
 
-    private static string RoleToString(DraftModelChatRole role) => role switch
+    private static string RoleToString(SimpleModelServerChatRole role) => role switch
     {
-        DraftModelChatRole.System => "system",
-        DraftModelChatRole.Assistant => "assistant",
+        SimpleModelServerChatRole.System => "system",
+        SimpleModelServerChatRole.Assistant => "assistant",
         _ => "user",
     };
 
-    private static bool TryParseStatus(string raw, out DraftModelHealthStatus status)
+    private static bool TryParseStatus(string raw, out SimpleModelServerHealthStatus status)
     {
         foreach (var candidate in KnownStatuses)
         {
@@ -184,16 +184,16 @@ public sealed class HttpDraftModelClient : IDraftModelClient, IDisposable
             }
         }
 
-        status = DraftModelHealthStatus.Unreachable;
+        status = SimpleModelServerHealthStatus.Unreachable;
         return false;
     }
 
-    private static string RawStatus(DraftModelHealthStatus status) => status switch
+    private static string RawStatus(SimpleModelServerHealthStatus status) => status switch
     {
-        DraftModelHealthStatus.Ok => "ok",
-        DraftModelHealthStatus.WarmingUp => "warming_up",
-        DraftModelHealthStatus.Degraded => "degraded",
-        DraftModelHealthStatus.Unhealthy => "unhealthy",
+        SimpleModelServerHealthStatus.Ok => "ok",
+        SimpleModelServerHealthStatus.WarmingUp => "warming_up",
+        SimpleModelServerHealthStatus.Degraded => "degraded",
+        SimpleModelServerHealthStatus.Unhealthy => "unhealthy",
         _ => "unreachable",
     };
 

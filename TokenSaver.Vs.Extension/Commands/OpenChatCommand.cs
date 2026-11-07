@@ -9,7 +9,7 @@ using TokenSaver.Vs.Extension.Settings;
 
 namespace TokenSaver.Vs.Extension.Commands;
 
-/// <summary>Opens the DraftModel chat window (see <see cref="ChatWindow"/>) as a non-modal WPF
+/// <summary>Opens the SimpleModelServer chat window (see <see cref="ChatWindow"/>) as a non-modal WPF
 /// window, so it stays open alongside the editor for a running conversation.</summary>
 [VisualStudioContribution]
 public sealed class OpenChatCommand(VisualStudioExtensibility extensibility) : Command(extensibility)

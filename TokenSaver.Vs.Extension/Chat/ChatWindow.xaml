@@ -1,7 +1,7 @@
 <Window x:Class="TokenSaver.Vs.Extension.Chat.ChatWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="DraftModel Chat"
+        Title="SimpleModelServer Chat"
         Width="520" Height="640"
         MinWidth="360" MinHeight="360"
         WindowStartupLocation="CenterScreen">

@@ -11,9 +11,9 @@ using TokenSaver.Vs.Extension.Services;
 namespace TokenSaver.Vs.Extension.Chat;
 
 /// <summary>
-/// Persistent, non-modal chat window for DraftModel — the dedicated chat surface referenced by
+/// Persistent, non-modal chat window for SimpleModelServer — the dedicated chat surface referenced by
 /// <see cref="TokenSaver.Vs.Extension.Commands.OpenChatCommand"/>. Unlike the per-selection
-/// DraftModel editor commands (which stream one-shot responses to the Output window), this keeps
+/// SimpleModelServer editor commands (which stream one-shot responses to the Output window), this keeps
 /// a running conversation and lets the user keep working in the editor while it's open.
 /// </summary>
 public sealed partial class ChatWindow : Window, IDisposable
@@ -21,8 +21,8 @@ public sealed partial class ChatWindow : Window, IDisposable
     private static readonly Uri DefaultBaseUrl = new("http://localhost:11435");
 
     private readonly ObservableCollection<ChatMessageDisplay> _messages = [];
-    private readonly List<DraftModelChatMessage> _history = [];
-    private readonly IDraftModelClient _client;
+    private readonly List<SimpleModelServerChatMessage> _history = [];
+    private readonly ISimpleModelServerClient _client;
     private readonly CancellationTokenSource _cts = new();
 
     public ChatWindow()
@@ -30,9 +30,9 @@ public sealed partial class ChatWindow : Window, IDisposable
     {
     }
 
-    internal ChatWindow(IDraftModelClient? client)
+    internal ChatWindow(ISimpleModelServerClient? client)
     {
-        _client = client ?? new HttpDraftModelClient(DefaultBaseUrl);
+        _client = client ?? new HttpSimpleModelServerClient(DefaultBaseUrl);
         InitializeComponent();
         MessagesList.ItemsSource = _messages;
         Closed += (_, _) => Dispose();
@@ -68,21 +68,21 @@ public sealed partial class ChatWindow : Window, IDisposable
         InputTextBox.Clear();
         SendButton.IsEnabled = false;
 
-        var userMessage = new ChatMessageDisplay(DraftModelChatRole.User) { Text = text };
+        var userMessage = new ChatMessageDisplay(SimpleModelServerChatRole.User) { Text = text };
         _messages.Add(userMessage);
-        _history.Add(new DraftModelChatMessage(DraftModelChatRole.User, text));
+        _history.Add(new SimpleModelServerChatMessage(SimpleModelServerChatRole.User, text));
         ScrollToEnd();
 
-        var assistantMessage = new ChatMessageDisplay(DraftModelChatRole.Assistant);
+        var assistantMessage = new ChatMessageDisplay(SimpleModelServerChatRole.Assistant);
         _messages.Add(assistantMessage);
 
         try
         {
             var health = await _client.CheckHealthAsync(_cts.Token).ConfigureAwait(true);
-            if (health.Status == DraftModelHealthStatus.Unreachable)
+            if (health.Status == SimpleModelServerHealthStatus.Unreachable)
             {
                 assistantMessage.Text =
-                    $"DraftModel is not reachable at {DefaultBaseUrl}. Start it via " +
+                    $"SimpleModelServer is not reachable at {DefaultBaseUrl}. Start it via " +
                     "'TokenSaver: Start TokenSaver MCP Server'.";
                 return;
             }
@@ -98,7 +98,7 @@ public sealed partial class ChatWindow : Window, IDisposable
                 }
             }
 
-            _history.Add(new DraftModelChatMessage(DraftModelChatRole.Assistant, responseText));
+            _history.Add(new SimpleModelServerChatMessage(SimpleModelServerChatRole.Assistant, responseText));
         }
         catch (OperationCanceledException)
         {
@@ -106,7 +106,7 @@ public sealed partial class ChatWindow : Window, IDisposable
         }
         catch (Exception ex) when (ex is InvalidOperationException or System.Net.Http.HttpRequestException)
         {
-            assistantMessage.Text = $"DraftModel request failed: {ex.Message}";
+            assistantMessage.Text = $"SimpleModelServer request failed: {ex.Message}";
         }
         finally
         {

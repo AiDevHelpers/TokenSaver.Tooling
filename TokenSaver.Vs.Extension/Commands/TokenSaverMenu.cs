@@ -8,7 +8,7 @@ namespace TokenSaver.Vs.Extension.Commands;
 /// <summary>
 /// Top-level "TokenSaver" submenu under Visual Studio's main "Extensions" menu, holding
 /// extension-wide commands (Settings, chat) that aren't specific to a code selection — unlike the
-/// per-selection "DraftModel" submenu on the editor context menu (see <see cref="DraftModelMenu"/>).
+/// per-selection "SimpleModelServer" submenu on the editor context menu (see <see cref="SimpleModelServerMenu"/>).
 /// Parented to IDG_VS_EXTENSIONS (0x6000) — the standard group for third-party entries directly
 /// under the Extensions menu (guidSHLMainMenu, see vsshlids.h).
 /// </summary>
