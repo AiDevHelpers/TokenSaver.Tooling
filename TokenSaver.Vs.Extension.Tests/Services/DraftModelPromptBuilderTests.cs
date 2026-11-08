@@ -1,3 +1,4 @@
+using System;
 using TokenSaver.Vs.Extension.Services;
 using Xunit;
 
@@ -28,7 +29,7 @@ public sealed class DraftModelPromptBuilderTests
         var messages = DraftModelPromptBuilder.BuildMessages(action, "int x = 1;", languageId: "csharp");
 
         Assert.Equal("```csharp\nint x = 1;\n```", messages[1].Content);
-        Assert.Contains("csharp", messages[0].Content);
+        Assert.Contains("csharp", messages[0].Content, StringComparison.Ordinal);
     }
 
     [Fact]

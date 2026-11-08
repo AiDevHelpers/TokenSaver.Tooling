@@ -52,9 +52,8 @@ public static class HealthCheckClient
         try
         {
             using var client = new TcpClient();
-            var connectTask = client.ConnectAsync(host, port);
-            var completed = await Task.WhenAny(connectTask, Task.Delay(TimeSpan.FromSeconds(2))).ConfigureAwait(false);
-            return completed == connectTask && client.Connected;
+            await client.ConnectAsync(host, port).WaitAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
+            return client.Connected;
         }
         catch
         {
