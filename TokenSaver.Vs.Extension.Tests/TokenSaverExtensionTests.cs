@@ -16,7 +16,7 @@ public sealed class TokenSaverExtensionTests
         try
         {
             var logger = new DefaultExtensionLogger();
-            var extension = new TokenSaverExtension(tempDir, logger);
+            using var extension = new TokenSaverExtension(tempDir, logger);
 
             Assert.NotNull(extension);
         }
@@ -48,7 +48,7 @@ public sealed class TokenSaverExtensionTests
         try
         {
             var logger = new DefaultExtensionLogger();
-            var extension = new TokenSaverExtension(tempDir, logger);
+            using var extension = new TokenSaverExtension(tempDir, logger);
 
             await extension.InitializeAsync();
 

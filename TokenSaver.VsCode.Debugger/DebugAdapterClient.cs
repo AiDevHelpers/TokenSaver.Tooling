@@ -17,7 +17,7 @@ public sealed class DebugAdapterClient : IAsyncDisposable
     private NamedPipeClientStream? _pipeClient;
     private StreamWriter? _writer;
     private StreamReader? _reader;
-    private readonly object _lockObject = new();
+    private readonly SemaphoreSlim _writeLock = new(1, 1);
 
     public DebugAdapterClient(string ideType = "VsCode")
     {
@@ -40,7 +40,11 @@ public sealed class DebugAdapterClient : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            _pipeClient?.Dispose();
+            if (_pipeClient is not null)
+            {
+                await _pipeClient.DisposeAsync();
+            }
+
             _pipeClient = null;
             throw new InvalidOperationException($"Failed to connect to debug adapter via named pipe '{_namedPipeName}': {ex.Message}", ex);
         }
@@ -54,14 +58,20 @@ public sealed class DebugAdapterClient : IAsyncDisposable
         if (_writer == null || _reader == null)
             throw new InvalidOperationException("Not connected to debug adapter");
 
-        lock (_lockObject)
-        {
-            var request = new DebugRequest(
-                command.ToString(),
-                JsonSerializer.Serialize(new { }),
-                Guid.NewGuid().ToString("N")[..12]);
+        var request = new DebugRequest(
+            command.ToString(),
+            JsonSerializer.Serialize(new { }),
+            Guid.NewGuid().ToString("N")[..12]);
+        var requestLine = JsonSerializer.Serialize(request);
 
-            _writer.WriteLine(JsonSerializer.Serialize(request));
+        await _writeLock.WaitAsync(ct);
+        try
+        {
+            await _writer.WriteLineAsync(requestLine);
+        }
+        finally
+        {
+            _writeLock.Release();
         }
 
         // Read response
@@ -87,6 +97,7 @@ public sealed class DebugAdapterClient : IAsyncDisposable
 
         _reader?.Dispose();
         _pipeClient?.Dispose();
+        _writeLock.Dispose();
     }
 }
 

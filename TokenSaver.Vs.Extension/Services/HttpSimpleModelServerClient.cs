@@ -44,7 +44,7 @@ public sealed class HttpSimpleModelServerClient : ISimpleModelServerClient, IDis
     {
         try
         {
-            using var response = await _httpClient.GetAsync("/health", cancellationToken).ConfigureAwait(false);
+            using var response = await _httpClient.GetAsync(new Uri("/health", UriKind.Relative), cancellationToken).ConfigureAwait(false);
             var body = await response.Content
                 .ReadFromJsonAsync<HealthBody>(cancellationToken)
                 .ConfigureAwait(false);
@@ -66,7 +66,7 @@ public sealed class HttpSimpleModelServerClient : ISimpleModelServerClient, IDis
 
     public async Task<IReadOnlyList<SimpleModelServerInfo>> ListModelsAsync(CancellationToken cancellationToken = default)
     {
-        using var response = await _httpClient.GetAsync("/v1/models", cancellationToken).ConfigureAwait(false);
+        using var response = await _httpClient.GetAsync(new Uri("/v1/models", UriKind.Relative), cancellationToken).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode)
         {
             throw new InvalidOperationException($"SimpleModelServer /v1/models returned {(int)response.StatusCode}");
@@ -111,7 +111,7 @@ public sealed class HttpSimpleModelServerClient : ISimpleModelServerClient, IDis
         using var reader = new StreamReader(stream, Encoding.UTF8);
 
         var frameLines = new List<string>();
-        while (!reader.EndOfStream)
+        while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);

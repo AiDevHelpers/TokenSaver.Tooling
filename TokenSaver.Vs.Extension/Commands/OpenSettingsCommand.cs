@@ -22,6 +22,7 @@ public sealed class OpenSettingsCommand(
 
     public override async Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
     {
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
         var shell = await vsShell.GetServiceAsync().ConfigureAwait(true);
         var packageGuid = new Guid(TokenSaverPackage.PackageGuidString);
         shell.LoadPackage(ref packageGuid, out var vsPackage);
