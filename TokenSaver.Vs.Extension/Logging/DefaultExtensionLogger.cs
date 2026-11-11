@@ -17,7 +17,7 @@ public sealed class DefaultExtensionLogger : IExtensionLogger
 
     public void LogException(Exception exception) => Record("ERROR", exception.ToString());
 
-    public IReadOnlyList<string> GetEntries() => [.. _entries];
+    public IReadOnlyList<string> Entries => [.. _entries];
 
     private void Record(string level, string message)
     {
