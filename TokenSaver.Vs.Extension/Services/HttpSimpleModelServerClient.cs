@@ -205,30 +205,35 @@ public sealed class HttpSimpleModelServerClient : ISimpleModelServerClient, IDis
         }
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes", Justification = "Instantiated by System.Text.Json deserialization.")]
     private sealed class HealthBody
     {
         [JsonPropertyName("status")]
         public string? Status { get; set; }
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes", Justification = "Instantiated by System.Text.Json deserialization.")]
     private sealed class ModelsListBody
     {
         [JsonPropertyName("data")]
         public List<ModelEntry>? Data { get; set; }
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes", Justification = "Instantiated by System.Text.Json deserialization.")]
     private sealed class ModelEntry
     {
         [JsonPropertyName("id")]
         public string? Id { get; set; }
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes", Justification = "Instantiated by System.Text.Json deserialization.")]
     private sealed class ChatCompletionChunk
     {
         [JsonPropertyName("choices")]
         public List<ChatCompletionChoice>? Choices { get; set; }
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes", Justification = "Instantiated by System.Text.Json deserialization.")]
     private sealed class ChatCompletionChoice
     {
         [JsonPropertyName("delta")]
@@ -238,6 +243,7 @@ public sealed class HttpSimpleModelServerClient : ISimpleModelServerClient, IDis
         public string? FinishReason { get; set; }
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes", Justification = "Instantiated by System.Text.Json deserialization.")]
     private sealed class ChatCompletionDelta
     {
         [JsonPropertyName("content")]
