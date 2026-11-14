@@ -40,6 +40,10 @@ internal sealed class IdeActions(DTE2 dte)
         "addWatch" => AddWatch(RequireString(args, "expression")),
         "removeWatch" => RemoveWatch(RequireString(args, "expression")),
         "listWatches" => ListWatches(),
+        "listConfigurations" => ListConfigurations(),
+        "setConfiguration" => SetConfiguration(RequireString(args, "configuration")),
+        "clean" => Clean(),
+        "publish" => Publish(),
         _ => throw new NotSupportedException($"Unknown action '{action}'."),
     };
 
@@ -283,6 +287,48 @@ internal sealed class IdeActions(DTE2 dte)
         }).ToList();
 
         return new { count = items.Count, watches = items };
+    }
+
+    private object ListConfigurations()
+    {
+        var configurations = dte.Solution.SolutionBuild.SolutionConfigurations;
+        var names = new List<string>();
+        for (var i = 1; i <= configurations.Count; i++)
+        {
+            names.Add(configurations.Item(i).Name);
+        }
+
+        return new { active = dte.Solution.SolutionBuild.ActiveConfiguration?.Name, configurations = names };
+    }
+
+    private object SetConfiguration(string name)
+    {
+        var configurations = dte.Solution.SolutionBuild.SolutionConfigurations;
+        for (var i = 1; i <= configurations.Count; i++)
+        {
+            var configuration = configurations.Item(i);
+            if (string.Equals(configuration.Name, name, StringComparison.OrdinalIgnoreCase))
+            {
+                configuration.Activate();
+                return new { active = dte.Solution.SolutionBuild.ActiveConfiguration?.Name };
+            }
+        }
+
+        throw new ArgumentException($"No solution configuration named '{name}'.");
+    }
+
+    private object Clean()
+    {
+        dte.Solution.SolutionBuild.Clean(true);
+        var failed = dte.Solution.SolutionBuild.LastBuildInfo;
+        return new { succeeded = failed == 0, configuration = dte.Solution.SolutionBuild.ActiveConfiguration?.Name };
+    }
+
+    // Publishes the startup project through the IDE's publish command. The command name is not verified against a live IDE.
+    private object Publish()
+    {
+        dte.ExecuteCommand("Build.PublishSelection");
+        return new { command = "Build.PublishSelection", configuration = dte.Solution.SolutionBuild.ActiveConfiguration?.Name };
     }
 
     private void RequireBreakMode()
