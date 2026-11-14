@@ -5,7 +5,9 @@ using Microsoft.VisualStudio.Extensibility;
 using Microsoft.VisualStudio.Extensibility.Commands;
 
 using TokenSaver.Vs.Extension.Chat;
+using TokenSaver.Vs.Extension.Logging;
 using TokenSaver.Vs.Extension.Settings;
+using TokenSaver.Vs.Extension.Workspace;
 
 namespace TokenSaver.Vs.Extension.Commands;
 
@@ -16,9 +18,21 @@ public sealed class OpenChatCommand(VisualStudioExtensibility extensibility) : C
 {
     public override CommandConfiguration CommandConfiguration => new("Open Chat");
 
-    public override Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
+    public override async Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
     {
+        ExtensionLog.Logger.LogInfo("Opening SimpleModelServer chat window");
+
+        var solutionFolder = await SolutionFolder.GetAsync(this.Extensibility, cancellationToken).ConfigureAwait(false);
+        if (solutionFolder is null)
+        {
+            ExtensionLog.Logger.LogInfo("No solution open; skipping TokenSaver workspace setup");
+        }
+        else
+        {
+            using var tokenSaver = new TokenSaverExtension(solutionFolder, ExtensionLog.Logger);
+            await tokenSaver.InitializeAsync().ConfigureAwait(false);
+        }
+
         StaWindowLauncher.ShowNonModal(() => new ChatWindow());
-        return Task.CompletedTask;
     }
 }

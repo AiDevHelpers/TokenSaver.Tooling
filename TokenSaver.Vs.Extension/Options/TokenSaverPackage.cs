@@ -22,6 +22,9 @@ public sealed class TokenSaverPackage : AsyncPackage
 {
     public const string PackageGuidString = "34c83c12-40e0-4c22-bf7e-f6f2f2a16636";
 
-    protected override Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress) =>
-        Task.CompletedTask;
+    protected override Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
+    {
+        TokenSaver.Vs.Extension.Logging.ExtensionLog.Logger.LogInfo("TokenSaver package initialized");
+        return Task.CompletedTask;
+    }
 }

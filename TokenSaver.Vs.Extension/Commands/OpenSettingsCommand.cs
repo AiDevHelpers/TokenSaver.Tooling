@@ -22,6 +22,21 @@ public sealed class OpenSettingsCommand(
 
     public override async Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
     {
+        var logger = TokenSaver.Vs.Extension.Logging.ExtensionLog.Logger;
+        logger.LogInfo("Opening TokenSaver settings");
+
+        var solutionFolder = await TokenSaver.Vs.Extension.Workspace.SolutionFolder
+            .GetAsync(this.Extensibility, cancellationToken).ConfigureAwait(false);
+        if (solutionFolder is null)
+        {
+            logger.LogInfo("No solution open; skipping TokenSaver workspace setup");
+        }
+        else
+        {
+            using var tokenSaver = new TokenSaverExtension(solutionFolder, logger);
+            await tokenSaver.InitializeAsync().ConfigureAwait(false);
+        }
+
         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
         var shell = await vsShell.GetServiceAsync().ConfigureAwait(true);
         var packageGuid = new Guid(TokenSaverPackage.PackageGuidString);

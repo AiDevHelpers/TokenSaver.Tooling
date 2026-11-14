@@ -6,7 +6,9 @@ using Microsoft.VisualStudio.Extensibility;
 using Microsoft.VisualStudio.Extensibility.Commands;
 using Microsoft.VisualStudio.Extensibility.Editor;
 using Microsoft.VisualStudio.Extensibility.Shell;
+using TokenSaver.Vs.Extension.Logging;
 using TokenSaver.Vs.Extension.Services;
+using TokenSaver.Vs.Extension.Workspace;
 
 namespace TokenSaver.Vs.Extension.Commands;
 
@@ -31,6 +33,19 @@ public abstract class SimpleModelServerCommandBase : Command
 
     public override async Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
     {
+        ExtensionLog.Logger.LogInfo($"Running SimpleModelServer action {this.Action}");
+
+        var solutionFolder = await SolutionFolder.GetAsync(this.Extensibility, cancellationToken).ConfigureAwait(false);
+        if (solutionFolder is null)
+        {
+            ExtensionLog.Logger.LogInfo("No solution open; skipping TokenSaver workspace setup");
+        }
+        else
+        {
+            using var tokenSaver = new TokenSaverExtension(solutionFolder, ExtensionLog.Logger);
+            await tokenSaver.InitializeAsync().ConfigureAwait(false);
+        }
+
         var outputChannel = await this.Extensibility.Views().Output
             .CreateOutputChannelAsync(OutputChannelName, cancellationToken)
             .ConfigureAwait(false);
