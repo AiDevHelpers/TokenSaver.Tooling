@@ -39,6 +39,7 @@
     <PackageReference Include="Microsoft.VisualStudio.Extensibility.Sdk" Version="17.14.40608" PrivateAssets="all" />
     <PackageReference Include="Microsoft.VisualStudio.Extensibility.Build" Version="17.14.40608" PrivateAssets="all" />
     <PackageReference Include="Microsoft.VisualStudio.Sdk" Version="17.14.40265" PrivateAssets="all" ExcludeAssets="runtime" />
+    <PackageReference Include="EnvDTE" Version="17.14.40260" />
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="8.0.1" />
     <PackageReference Include="SperryDev.Logger" Version="$(SperryLoggerVersion)" />
   </ItemGroup>

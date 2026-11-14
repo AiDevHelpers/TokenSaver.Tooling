@@ -1,0 +1,314 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
+
+using EnvDTE;
+using EnvDTE80;
+
+namespace TokenSaver.Vs.Extension.Bridge;
+
+/// <summary>
+/// Implements the common IDE actions over the EnvDTE automation object. Must run on the Visual Studio UI thread.
+/// Every action returns a result object or throws; <see cref="BridgeServer"/> turns exceptions into an error reply.
+/// </summary>
+internal sealed class IdeActions(DTE2 dte)
+{
+    public object Invoke(string action, JsonElement args) => action switch
+    {
+        "status" => new { solution_path = NullIfEmpty(dte.Solution?.FullName) },
+        "setStartupProject" => SetStartupProject(RequireString(args, "project")),
+        "startDebugging" => StartDebugging(),
+        "stopDebugging" => StopDebugging(),
+        "runTests" => RunTests(),
+        "formatDocument" => FormatDocument(),
+        "build" => Build(),
+        "getBuildDiagnostics" => GetBuildDiagnostics(OptionalString(args, "severity") ?? "all"),
+        "codeCleanup" => CodeCleanup(),
+        "getOutput" => GetOutput(OptionalString(args, "pane") ?? "Build", OptionalInt(args, "maxLines") ?? 200),
+        "getLocals" => GetLocals(OptionalInt(args, "maxItems") ?? 100),
+        "setBreakpoint" => SetBreakpoint(RequireString(args, "file"), RequireInt(args, "line")),
+        "removeBreakpoint" => RemoveBreakpoint(RequireString(args, "file"), RequireInt(args, "line")),
+        "listBreakpoints" => ListBreakpoints(),
+        "step" => Step(RequireString(args, "mode")),
+        "debugState" => DebugState(),
+        _ => throw new NotSupportedException($"Unknown action '{action}'."),
+    };
+
+    private object SetStartupProject(string projectName)
+    {
+        var project = FindProject(projectName)
+            ?? throw new InvalidOperationException($"No project named '{projectName}' in the open solution.");
+
+        dte.Solution.SolutionBuild.StartupProjects = new object[] { project.UniqueName };
+        return new { startup_project = project.UniqueName };
+    }
+
+    private object StartDebugging()
+    {
+        dte.Debugger.Go(false);
+        return new { debugger_mode = dte.Debugger.CurrentMode.ToString() };
+    }
+
+    private object StopDebugging()
+    {
+        dte.Debugger.Stop(false);
+        return new { debugger_mode = dte.Debugger.CurrentMode.ToString() };
+    }
+
+    private object RunTests()
+    {
+        // Runs every test in the solution through Test Explorer. Filtering is not supported yet.
+        dte.ExecuteCommand("TestExplorer.RunAllTests");
+        return new { command = "TestExplorer.RunAllTests" };
+    }
+
+    private object FormatDocument()
+    {
+        if (dte.ActiveDocument is null)
+        {
+            throw new InvalidOperationException("No active document to format.");
+        }
+
+        dte.ExecuteCommand("Edit.FormatDocument");
+        return new { document = dte.ActiveDocument.FullName };
+    }
+
+    private object Build()
+    {
+        dte.Solution.SolutionBuild.Build(WaitForBuildToFinish: true);
+        var failed = dte.Solution.SolutionBuild.LastBuildInfo;
+        return new { succeeded = failed == 0, failed_projects = failed };
+    }
+
+    // Reads the Error List, which holds the last build's errors and warnings.
+    // vsBuildErrorLevel: 1 = error, 2 = warning (per EnvDTE); other levels are excluded.
+    private object GetBuildDiagnostics(string severity)
+    {
+        var wanted = severity.ToLowerInvariant();
+        var items = new List<object>();
+        var errors = dte.ToolWindows.ErrorList.ErrorItems;
+        for (var i = 1; i <= errors.Count; i++)
+        {
+            ErrorItem item = errors.Item(i);
+            var kind = item.ErrorLevel switch
+            {
+                vsBuildErrorLevel.vsBuildErrorLevelHigh => "error",
+                vsBuildErrorLevel.vsBuildErrorLevelMedium => "warning",
+                _ => null,
+            };
+
+            if (kind is null || (wanted != "all" && wanted != kind + "s" && wanted != kind))
+            {
+                continue;
+            }
+
+            items.Add(new { severity = kind, file = item.FileName, line = item.Line, column = item.Column, message = item.Description });
+        }
+
+        return new { count = items.Count, diagnostics = items };
+    }
+
+    // Runs Visual Studio's Code Cleanup on the active document. The command name is not verified against a live IDE.
+    private object CodeCleanup()
+    {
+        if (dte.ActiveDocument is null)
+        {
+            throw new InvalidOperationException("No active document to clean up.");
+        }
+
+        dte.ExecuteCommand("Edit.RunCodeCleanup");
+        return new { document = dte.ActiveDocument.FullName };
+    }
+
+    private object GetOutput(string paneName, int maxLines)
+    {
+        foreach (OutputWindowPane pane in dte.ToolWindows.OutputWindow.OutputWindowPanes)
+        {
+            if (!string.Equals(pane.Name, paneName, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var doc = pane.TextDocument;
+            var text = doc.StartPoint.CreateEditPoint().GetText(doc.EndPoint);
+            var lines = text.Split('\n');
+            var tail = lines.Skip(Math.Max(0, lines.Length - maxLines));
+            return new { pane = pane.Name, lines = tail.Select(l => l.TrimEnd('\r')).ToList() };
+        }
+
+        throw new InvalidOperationException($"No output pane named '{paneName}'.");
+    }
+
+    private object GetLocals(int maxItems)
+    {
+        if (dte.Debugger.CurrentMode != dbgDebugMode.dbgBreakMode)
+        {
+            throw new InvalidOperationException("Not stopped at a breakpoint; locals are only available in break mode.");
+        }
+
+        var frame = dte.Debugger.CurrentStackFrame
+            ?? throw new InvalidOperationException("No current stack frame.");
+
+        var locals = new List<object>();
+        foreach (Expression expression in frame.Locals)
+        {
+            if (locals.Count >= maxItems)
+            {
+                break;
+            }
+
+            locals.Add(new { name = expression.Name, value = expression.Value, type = expression.Type });
+        }
+
+        return new { function = frame.FunctionName, count = locals.Count, locals };
+    }
+
+    private object SetBreakpoint(string file, int line)
+    {
+        var breakpoints = dte.Debugger.Breakpoints.Add(File: file, Line: line);
+        return new { file, line, added = breakpoints.Count };
+    }
+
+    private object RemoveBreakpoint(string file, int line)
+    {
+        var breakpoints = dte.Debugger.Breakpoints;
+        var removed = 0;
+        for (var i = breakpoints.Count; i >= 1; i--)
+        {
+            var bp = breakpoints.Item(i);
+            if (SameFile(bp.File, file) && bp.FileLine == line)
+            {
+                bp.Delete();
+                removed++;
+            }
+        }
+
+        return new { file, line, removed };
+    }
+
+    private object ListBreakpoints()
+    {
+        var breakpoints = dte.Debugger.Breakpoints;
+        var list = new List<object>();
+        for (var i = 1; i <= breakpoints.Count; i++)
+        {
+            var bp = breakpoints.Item(i);
+            list.Add(new { file = bp.File, line = bp.FileLine, enabled = bp.Enabled, condition = bp.Condition, function = bp.FunctionName });
+        }
+
+        return new { count = list.Count, breakpoints = list };
+    }
+
+    private object Step(string mode)
+    {
+        switch (mode.ToLowerInvariant())
+        {
+            case "over":
+                dte.Debugger.StepOver(false);
+                break;
+            case "into":
+                dte.Debugger.StepInto(false);
+                break;
+            case "out":
+                dte.Debugger.StepOut(false);
+                break;
+            default:
+                throw new ArgumentException("Step mode must be 'over', 'into', or 'out'.");
+        }
+
+        return new { mode, debugger_mode = dte.Debugger.CurrentMode.ToString() };
+    }
+
+    private object DebugState()
+    {
+        var breakMode = dte.Debugger.CurrentMode == dbgDebugMode.dbgBreakMode;
+        return new
+        {
+            debugger_mode = dte.Debugger.CurrentMode.ToString(),
+            function = breakMode ? dte.Debugger.CurrentStackFrame?.FunctionName : null,
+        };
+    }
+
+    private static bool SameFile(string? a, string b) =>
+        !string.IsNullOrEmpty(a) && string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase);
+
+    private Project? FindProject(string name)
+    {
+        foreach (Project project in dte.Solution.Projects)
+        {
+            var found = FindInProject(project, name);
+            if (found is not null)
+            {
+                return found;
+            }
+        }
+
+        return null;
+    }
+
+    // Walks solution folders recursively so projects nested in folders can be targeted.
+    private static Project? FindInProject(Project project, string name)
+    {
+        if (string.Equals(project.Name, name, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(project.UniqueName, name, StringComparison.OrdinalIgnoreCase))
+        {
+            return project;
+        }
+
+        foreach (Project child in Subprojects(project))
+        {
+            var found = FindInProject(child, name);
+            if (found is not null)
+            {
+                return found;
+            }
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<Project> Subprojects(Project folder)
+    {
+        foreach (ProjectItem item in folder.ProjectItems)
+        {
+            if (item.SubProject is Project sub)
+            {
+                yield return sub;
+            }
+        }
+    }
+
+    private static string? OptionalString(JsonElement args, string name) =>
+        args.ValueKind == JsonValueKind.Object && args.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
+
+    private static int? OptionalInt(JsonElement args, string name) =>
+        args.ValueKind == JsonValueKind.Object && args.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number
+            ? value.GetInt32()
+            : null;
+
+    private static int RequireInt(JsonElement args, string name)
+    {
+        if (args.ValueKind != JsonValueKind.Object || !args.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.Number)
+        {
+            throw new ArgumentException($"Missing integer argument '{name}'.");
+        }
+
+        return value.GetInt32();
+    }
+
+    private static string RequireString(JsonElement args, string name)
+    {
+        if (args.ValueKind != JsonValueKind.Object || !args.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.String)
+        {
+            throw new ArgumentException($"Missing string argument '{name}'.");
+        }
+
+        return value.GetString()!;
+    }
+
+    private static string? NullIfEmpty(string? value) => string.IsNullOrEmpty(value) ? null : value;
+}
