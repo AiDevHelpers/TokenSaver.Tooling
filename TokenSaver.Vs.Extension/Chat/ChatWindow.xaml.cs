@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 
+using TokenSaver.Vs.Extension.Configuration;
 using TokenSaver.Vs.Extension.Services;
 
 namespace TokenSaver.Vs.Extension.Chat;
@@ -18,7 +19,7 @@ namespace TokenSaver.Vs.Extension.Chat;
 /// </summary>
 public sealed partial class ChatWindow : Window, IDisposable
 {
-    private static readonly Uri DefaultBaseUrl = new("http://localhost:11435");
+
 
     private readonly ObservableCollection<ChatMessageDisplay> _messages = [];
     private readonly List<SimpleModelServerChatMessage> _history = [];
@@ -32,7 +33,7 @@ public sealed partial class ChatWindow : Window, IDisposable
 
     internal ChatWindow(ISimpleModelServerClient? client)
     {
-        _client = client ?? new HttpSimpleModelServerClient(DefaultBaseUrl);
+        _client = client ?? new HttpSimpleModelServerClient(SimpleModelServerEndpoint.BaseUrl);
         InitializeComponent();
         MessagesList.ItemsSource = _messages;
         Closed += (_, _) => Dispose();
@@ -82,7 +83,7 @@ public sealed partial class ChatWindow : Window, IDisposable
             if (health.Status == SimpleModelServerHealthStatus.Unreachable)
             {
                 assistantMessage.Text =
-                    $"SimpleModelServer is not reachable at {DefaultBaseUrl}. Start it via " +
+                    $"SimpleModelServer is not reachable at {SimpleModelServerEndpoint.BaseUrl}. Start it via " +
                     "'TokenSaver: Start TokenSaver MCP Server'.";
                 return;
             }

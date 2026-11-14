@@ -22,14 +22,10 @@ public sealed class OpenChatCommand(VisualStudioExtensibility extensibility) : C
     {
         ExtensionLog.Logger.LogInfo("Opening SimpleModelServer chat window");
 
-        var solutionFolder = await SolutionFolder.GetAsync(this.Extensibility, cancellationToken).ConfigureAwait(false);
-        if (solutionFolder is null)
+        using var tokenSaver = await TokenSaverWorkspace.CreateForSolutionAsync(this.Extensibility, cancellationToken)
+            .ConfigureAwait(false);
+        if (tokenSaver is not null)
         {
-            ExtensionLog.Logger.LogInfo("No solution open; skipping TokenSaver workspace setup");
-        }
-        else
-        {
-            using var tokenSaver = new TokenSaverExtension(solutionFolder, ExtensionLog.Logger);
             await tokenSaver.InitializeAsync().ConfigureAwait(false);
         }
 

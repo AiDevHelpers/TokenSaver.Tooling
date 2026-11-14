@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using TokenSaver.Vs.Extension.Configuration;
@@ -17,14 +18,19 @@ public sealed class TokenSaverExtension : IDisposable
 {
     private const string TokenSaverServiceName = "TokenSaverMCP";
 
+    // Workspaces already shown the .gitignore notice this session, so it is not repeated on every command.
+    private static readonly ConcurrentDictionary<string, bool> PromptedWorkspaces = new(StringComparer.OrdinalIgnoreCase);
+
     private readonly IExtensionLogger _logger;
     private readonly string _workspaceRoot;
+    private readonly Func<string, Task>? _notify;
     private bool _usingTokenSaverService;
 
-    public TokenSaverExtension(string workspaceRoot, IExtensionLogger logger)
+    public TokenSaverExtension(string workspaceRoot, IExtensionLogger logger, Func<string, Task>? notify = null)
     {
         _workspaceRoot = workspaceRoot ?? throw new ArgumentNullException(nameof(workspaceRoot));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _notify = notify;
     }
 
     /// <summary>
@@ -52,6 +58,9 @@ public sealed class TokenSaverExtension : IDisposable
 
         if (GitignoreHelper.IsTokenSaverInGitignore(_workspaceRoot))
             return; // Already covered
+
+        if (!PromptedWorkspaces.TryAdd(_workspaceRoot, true))
+            return; // Already shown this session
 
         _logger.LogInfo("Checking .gitignore configuration...");
 
@@ -160,11 +169,16 @@ public sealed class TokenSaverExtension : IDisposable
     /// <summary>
     /// Prompts the user with a question (to be implemented by the VS extension UI).
     /// </summary>
-    private Task<(bool add, bool global)?> PromptUserAsync(string message, string option1, string option2, string option3)
+    private async Task<(bool add, bool global)?> PromptUserAsync(string message, string option1, string option2, string option3)
     {
-        // This would be overridden in the actual VS extension to show a dialog
+        // Yes/No choice is not implemented yet; the notice is shown and no change is made.
         _logger.LogInfo(message);
-        return Task.FromResult<(bool, bool)?>(null);
+        if (_notify is not null)
+        {
+            await _notify(message).ConfigureAwait(false);
+        }
+
+        return null;
     }
 
     public void Dispose()

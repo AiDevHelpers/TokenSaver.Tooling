@@ -16,6 +16,9 @@ public sealed class SperryExtensionLogger : IExtensionLogger
 {
     private const string Channel = "VisualStudio";
 
+    // Kept alive for the life of the process: the logger writes through this factory's providers.
+    private static ILoggerFactory? s_factory;
+
     private readonly ILogger _logger;
 
     public SperryExtensionLogger(ILogger logger)
@@ -26,13 +29,31 @@ public sealed class SperryExtensionLogger : IExtensionLogger
     /// <summary>Creates a logger on the SperryDev "VisualStudio" channel at Information level.</summary>
     public static SperryExtensionLogger Create()
     {
-        var factory = AppLoggerFactory.Create(Channel, LogEventLevel.Information);
-        return new SperryExtensionLogger(factory.CreateLogger("TokenSaver.Vs.Extension"));
+        s_factory = AppLoggerFactory.Create(Channel, LogEventLevel.Information);
+        return new SperryExtensionLogger(s_factory.CreateLogger("TokenSaver.Vs.Extension"));
     }
 
-    public void LogInfo(string message) => _logger.LogInformation("{Message}", message);
+    public void LogInfo(string message)
+    {
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation("{Message}", message);
+        }
+    }
 
-    public void LogError(string message) => _logger.LogError("{Message}", message);
+    public void LogError(string message)
+    {
+        if (_logger.IsEnabled(LogLevel.Error))
+        {
+            _logger.LogError("{Message}", message);
+        }
+    }
 
-    public void LogException(Exception exception) => _logger.LogError(exception, "{Message}", exception.Message);
+    public void LogException(Exception exception)
+    {
+        if (_logger.IsEnabled(LogLevel.Error))
+        {
+            _logger.LogError(exception, "{Message}", exception.Message);
+        }
+    }
 }

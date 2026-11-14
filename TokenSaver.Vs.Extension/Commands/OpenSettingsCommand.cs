@@ -25,15 +25,10 @@ public sealed class OpenSettingsCommand(
         var logger = TokenSaver.Vs.Extension.Logging.ExtensionLog.Logger;
         logger.LogInfo("Opening TokenSaver settings");
 
-        var solutionFolder = await TokenSaver.Vs.Extension.Workspace.SolutionFolder
-            .GetAsync(this.Extensibility, cancellationToken).ConfigureAwait(false);
-        if (solutionFolder is null)
+        using var tokenSaver = await TokenSaver.Vs.Extension.Workspace.TokenSaverWorkspace
+            .CreateForSolutionAsync(this.Extensibility, cancellationToken).ConfigureAwait(false);
+        if (tokenSaver is not null)
         {
-            logger.LogInfo("No solution open; skipping TokenSaver workspace setup");
-        }
-        else
-        {
-            using var tokenSaver = new TokenSaverExtension(solutionFolder, logger);
             await tokenSaver.InitializeAsync().ConfigureAwait(false);
         }
 

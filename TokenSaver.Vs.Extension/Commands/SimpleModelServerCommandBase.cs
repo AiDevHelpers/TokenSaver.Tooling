@@ -6,6 +6,7 @@ using Microsoft.VisualStudio.Extensibility;
 using Microsoft.VisualStudio.Extensibility.Commands;
 using Microsoft.VisualStudio.Extensibility.Editor;
 using Microsoft.VisualStudio.Extensibility.Shell;
+using TokenSaver.Vs.Extension.Configuration;
 using TokenSaver.Vs.Extension.Logging;
 using TokenSaver.Vs.Extension.Services;
 using TokenSaver.Vs.Extension.Workspace;
@@ -22,7 +23,7 @@ namespace TokenSaver.Vs.Extension.Commands;
 public abstract class SimpleModelServerCommandBase : Command
 {
     private const string OutputChannelName = "SimpleModelServer";
-    private static readonly Uri DefaultBaseUrl = new("http://localhost:11435");
+
 
     protected SimpleModelServerCommandBase(VisualStudioExtensibility extensibility)
         : base(extensibility)
@@ -35,14 +36,10 @@ public abstract class SimpleModelServerCommandBase : Command
     {
         ExtensionLog.Logger.LogInfo($"Running SimpleModelServer action {this.Action}");
 
-        var solutionFolder = await SolutionFolder.GetAsync(this.Extensibility, cancellationToken).ConfigureAwait(false);
-        if (solutionFolder is null)
+        using var tokenSaver = await TokenSaverWorkspace.CreateForSolutionAsync(this.Extensibility, cancellationToken)
+            .ConfigureAwait(false);
+        if (tokenSaver is not null)
         {
-            ExtensionLog.Logger.LogInfo("No solution open; skipping TokenSaver workspace setup");
-        }
-        else
-        {
-            using var tokenSaver = new TokenSaverExtension(solutionFolder, ExtensionLog.Logger);
             await tokenSaver.InitializeAsync().ConfigureAwait(false);
         }
 
@@ -79,12 +76,12 @@ public abstract class SimpleModelServerCommandBase : Command
 
         await outputChannel.WriteLineAsync($"--- SimpleModelServer: {this.Action} ---").ConfigureAwait(false);
 
-        using var client = new HttpSimpleModelServerClient(DefaultBaseUrl);
+        using var client = new HttpSimpleModelServerClient(SimpleModelServerEndpoint.BaseUrl);
         var health = await client.CheckHealthAsync(cancellationToken).ConfigureAwait(false);
         if (health.Status == SimpleModelServerHealthStatus.Unreachable)
         {
             await outputChannel.WriteLineAsync(
-                $"SimpleModelServer is not reachable at {DefaultBaseUrl}. Start it via 'TokenSaver: Start TokenSaver MCP Server'.")
+                $"SimpleModelServer is not reachable at {SimpleModelServerEndpoint.BaseUrl}. Start it via 'TokenSaver: Start TokenSaver MCP Server'.")
                 .ConfigureAwait(false);
             return;
         }
