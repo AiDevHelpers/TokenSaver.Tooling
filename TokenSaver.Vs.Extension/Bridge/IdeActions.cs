@@ -15,6 +15,9 @@ namespace TokenSaver.Vs.Extension.Bridge;
 /// </summary>
 internal sealed class IdeActions(DTE2 dte)
 {
+    // Watch expressions for this instance. Kept here (not in the Watch window) and evaluated on read.
+    private readonly List<string> _watches = [];
+
     public object Invoke(string action, JsonElement args) => action switch
     {
         "status" => new { solution_path = NullIfEmpty(dte.Solution?.FullName) },
@@ -33,6 +36,10 @@ internal sealed class IdeActions(DTE2 dte)
         "listBreakpoints" => ListBreakpoints(),
         "step" => Step(RequireString(args, "mode")),
         "debugState" => DebugState(),
+        "evaluate" => Evaluate(RequireString(args, "expression")),
+        "addWatch" => AddWatch(RequireString(args, "expression")),
+        "removeWatch" => RemoveWatch(RequireString(args, "expression")),
+        "listWatches" => ListWatches(),
         _ => throw new NotSupportedException($"Unknown action '{action}'."),
     };
 
@@ -229,6 +236,61 @@ internal sealed class IdeActions(DTE2 dte)
             debugger_mode = dte.Debugger.CurrentMode.ToString(),
             function = breakMode ? dte.Debugger.CurrentStackFrame?.FunctionName : null,
         };
+    }
+
+    private object Evaluate(string expression)
+    {
+        RequireBreakMode();
+        var result = dte.Debugger.GetExpression(expression, false, 5000);
+        return new
+        {
+            expression,
+            valid = result.IsValidValue,
+            value = result.Value,
+            type = result.Type,
+        };
+    }
+
+    private object AddWatch(string expression)
+    {
+        if (!_watches.Contains(expression))
+        {
+            _watches.Add(expression);
+        }
+
+        return new { count = _watches.Count, watches = _watches.ToList() };
+    }
+
+    private object RemoveWatch(string expression)
+    {
+        var removed = _watches.Remove(expression);
+        return new { removed, count = _watches.Count, watches = _watches.ToList() };
+    }
+
+    // Values are evaluated now. Outside break mode they are reported as unavailable, not as errors.
+    private object ListWatches()
+    {
+        var breakMode = dte.Debugger.CurrentMode == dbgDebugMode.dbgBreakMode;
+        var items = _watches.Select(expression =>
+        {
+            if (!breakMode)
+            {
+                return new { expression, valid = false, value = (string?)null, type = (string?)null, reason = "not stopped at a breakpoint" };
+            }
+
+            var result = dte.Debugger.GetExpression(expression, false, 5000);
+            return new { expression, valid = result.IsValidValue, value = result.Value, type = result.Type, reason = (string?)null };
+        }).ToList();
+
+        return new { count = items.Count, watches = items };
+    }
+
+    private void RequireBreakMode()
+    {
+        if (dte.Debugger.CurrentMode != dbgDebugMode.dbgBreakMode)
+        {
+            throw new InvalidOperationException("Not stopped at a breakpoint; expressions can only be evaluated in break mode.");
+        }
     }
 
     private static bool SameFile(string? a, string b) =>
