@@ -6,7 +6,7 @@
   "compilationOptions": {},
   "targets": {
     ".NETCoreApp,Version=v10.0": {
-      "TokenSaver.MCP.Tests/1.0.72-alpha-ga010d8bdb7": {
+      "TokenSaver.MCP.Tests/1.0.100-alpha-gbeb1d55961": {
         "dependencies": {
           "Microsoft.AspNetCore.TestHost": "10.0.9",
           "Microsoft.NET.Test.Sdk": "18.7.0",
@@ -188,21 +188,21 @@
           }
         }
       },
-      "Microsoft.Data.Sqlite/10.0.14": {
+      "Microsoft.Data.Sqlite/10.0.15": {
         "dependencies": {
-          "Microsoft.Data.Sqlite.Core": "10.0.14",
+          "Microsoft.Data.Sqlite.Core": "10.0.15",
           "SQLitePCLRaw.bundle_e_sqlite3": "2.1.13",
           "SQLitePCLRaw.core": "2.1.13"
         }
       },
-      "Microsoft.Data.Sqlite.Core/10.0.14": {
+      "Microsoft.Data.Sqlite.Core/10.0.15": {
         "dependencies": {
           "SQLitePCLRaw.core": "2.1.13"
         },
         "runtime": {
           "lib/net8.0/Microsoft.Data.Sqlite.dll": {
-            "assemblyVersion": "10.0.14.0",
-            "fileVersion": "10.0.1426.52326",
+            "assemblyVersion": "10.0.15.0",
+            "fileVersion": "10.0.1526.53008",
             "localPath": "Microsoft.Data.Sqlite.dll"
           }
         }
@@ -242,7 +242,7 @@
       },
       "Microsoft.EntityFrameworkCore.Sqlite.Core/10.0.9": {
         "dependencies": {
-          "Microsoft.Data.Sqlite.Core": "10.0.14",
+          "Microsoft.Data.Sqlite.Core": "10.0.15",
           "Microsoft.EntityFrameworkCore.Relational": "10.0.9",
           "Microsoft.Extensions.DependencyModel": "10.0.9",
           "SQLitePCLRaw.core": "2.1.13"
@@ -1005,7 +1005,7 @@
         "runtime": {
           "TokenSaver.AgentHelpers.Anthropic.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -1013,7 +1013,7 @@
         "runtime": {
           "TokenSaver.AgentHelpers.Core.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -1024,7 +1024,7 @@
         "runtime": {
           "TokenSaver.AgentHelpers.DeepSeek.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -1035,7 +1035,7 @@
         "runtime": {
           "TokenSaver.AgentHelpers.OpenSource.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -1046,13 +1046,13 @@
         "runtime": {
           "TokenSaver.AgentHelpers.Qwen.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
       "TokenSaver.CodeHelper/1.0.0": {
         "dependencies": {
-          "Microsoft.Data.Sqlite": "10.0.14",
+          "Microsoft.Data.Sqlite": "10.0.15",
           "TokenSaver.Common.Contracts": "1.0.0",
           "TokenSaver.Common.Models": "1.0.0",
           "TokenSaver.Config": "1.0.0",
@@ -1064,7 +1064,7 @@
         "runtime": {
           "TokenSaver.CodeHelper.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -1075,7 +1075,7 @@
         "runtime": {
           "TokenSaver.Common.Contracts.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -1086,7 +1086,7 @@
         "runtime": {
           "TokenSaver.Common.Core.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -1097,7 +1097,7 @@
         "runtime": {
           "TokenSaver.Common.Installation.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -1108,7 +1108,7 @@
         "runtime": {
           "TokenSaver.Common.Models.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -1120,7 +1120,7 @@
         "runtime": {
           "TokenSaver.Config.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -1128,20 +1128,20 @@
         "runtime": {
           "TokenSaver.ContextHelper.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
       "TokenSaver.Database.Context/1.0.0": {
         "dependencies": {
-          "Microsoft.Data.Sqlite.Core": "10.0.14",
+          "Microsoft.Data.Sqlite.Core": "10.0.15",
           "Microsoft.EntityFrameworkCore.Sqlite.Core": "10.0.9",
           "SQLitePCLRaw.bundle_winsqlite3": "2.1.11"
         },
         "runtime": {
           "TokenSaver.Database.Context.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -1156,7 +1156,7 @@
         "runtime": {
           "TokenSaver.Docs.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -1164,7 +1164,7 @@
         "runtime": {
           "TokenSaver.LanguageHelpers.Core.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -1176,7 +1176,7 @@
         "runtime": {
           "TokenSaver.LanguageHelpers.CSharp.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -1187,7 +1187,7 @@
         "runtime": {
           "TokenSaver.LanguageHelpers.PowerShell.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -1198,7 +1198,7 @@
         "runtime": {
           "TokenSaver.LanguageHelpers.Python.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -1230,7 +1230,7 @@
         "runtime": {
           "TokenSaver.MCP.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -1243,7 +1243,7 @@
         "runtime": {
           "TokenSaver.OllamaIntegration.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -1256,7 +1256,7 @@
         "runtime": {
           "TokenSaver.OllamaIntegration.Tests.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -1270,7 +1270,7 @@
         "runtime": {
           "TokenSaver.TokenEconomy.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -1285,7 +1285,7 @@
         "runtime": {
           "TokenSaver.TokenEconomy.Tests.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -1297,7 +1297,7 @@
         "runtime": {
           "TokenSaver.Utilities.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -1310,7 +1310,7 @@
         "runtime": {
           "TokenSaver.Utilities.Tests.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -1322,14 +1322,14 @@
         "runtime": {
           "TokenSaver.WslControl.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       }
     }
   },
   "libraries": {
-    "TokenSaver.MCP.Tests/1.0.72-alpha-ga010d8bdb7": {
+    "TokenSaver.MCP.Tests/1.0.100-alpha-gbeb1d55961": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
@@ -1376,19 +1376,19 @@
       "path": "microsoft.codecoverage/18.7.0",
       "hashPath": "microsoft.codecoverage.18.7.0.nupkg.sha512"
     },
-    "Microsoft.Data.Sqlite/10.0.14": {
+    "Microsoft.Data.Sqlite/10.0.15": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-muyroan6rKrf0omZL8UF7Kw5uOGp/yBg1L/XWvkFN3WhKaNtK2IWqRZw93nIwVqjhTVDO0l4CEGhHIh+mb+sKg==",
-      "path": "microsoft.data.sqlite/10.0.14",
-      "hashPath": "microsoft.data.sqlite.10.0.14.nupkg.sha512"
+      "sha512": "sha512-PtnNCUloQOLAXhB09id+0CL2c9yd+9/wi0QHCHPa+zrTKEJTdu07jlUgblFjorYhKnwcHN1VS0z75jN8vFruuQ==",
+      "path": "microsoft.data.sqlite/10.0.15",
+      "hashPath": "microsoft.data.sqlite.10.0.15.nupkg.sha512"
     },
-    "Microsoft.Data.Sqlite.Core/10.0.14": {
+    "Microsoft.Data.Sqlite.Core/10.0.15": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-1p9rO3Q2X/L/9YrYog3vaDzi8u+WZfJCOkDYoHqmofqYP0DLPLPyZcS2Rnh/79JXAodgbs1AgsaNwLpIvC3Xew==",
-      "path": "microsoft.data.sqlite.core/10.0.14",
-      "hashPath": "microsoft.data.sqlite.core.10.0.14.nupkg.sha512"
+      "sha512": "sha512-mjDz/zleAF78J1KRN9FludN2bzbsMWoXYSLVcawADle7RBhZYpFZYivGRvbvlH/RtXT/gjO0yhG99tzdFiET+A==",
+      "path": "microsoft.data.sqlite.core/10.0.15",
+      "hashPath": "microsoft.data.sqlite.core.10.0.15.nupkg.sha512"
     },
     "Microsoft.EntityFrameworkCore/10.0.9": {
       "type": "package",

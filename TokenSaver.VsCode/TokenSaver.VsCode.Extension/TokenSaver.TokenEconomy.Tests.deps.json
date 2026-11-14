@@ -6,7 +6,7 @@
   "compilationOptions": {},
   "targets": {
     ".NETCoreApp,Version=v10.0": {
-      "TokenSaver.TokenEconomy.Tests/1.0.72-alpha-ga010d8bdb7": {
+      "TokenSaver.TokenEconomy.Tests/1.0.100-alpha-gbeb1d55961": {
         "dependencies": {
           "Microsoft.Extensions.Logging.Abstractions": "10.0.9",
           "Microsoft.Extensions.Options": "10.0.9",
@@ -726,7 +726,7 @@
         "runtime": {
           "TokenSaver.Common.Contracts.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -738,7 +738,7 @@
         "runtime": {
           "TokenSaver.Common.Core.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -749,7 +749,7 @@
         "runtime": {
           "TokenSaver.Common.Models.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -762,7 +762,7 @@
         "runtime": {
           "TokenSaver.ContextHelper.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -775,7 +775,7 @@
         "runtime": {
           "TokenSaver.Database.Context.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -791,7 +791,7 @@
         "runtime": {
           "TokenSaver.OllamaIntegration.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -806,7 +806,7 @@
         "runtime": {
           "TokenSaver.OllamaIntegration.Tests.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -822,7 +822,7 @@
         "runtime": {
           "TokenSaver.TokenEconomy.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       },
@@ -836,14 +836,14 @@
         "runtime": {
           "TokenSaver.Utilities.dll": {
             "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.72.40976"
+            "fileVersion": "1.0.100.48817"
           }
         }
       }
     }
   },
   "libraries": {
-    "TokenSaver.TokenEconomy.Tests/1.0.72-alpha-ga010d8bdb7": {
+    "TokenSaver.TokenEconomy.Tests/1.0.100-alpha-gbeb1d55961": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
