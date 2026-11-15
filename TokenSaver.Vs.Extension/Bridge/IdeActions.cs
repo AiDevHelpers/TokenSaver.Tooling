@@ -44,6 +44,7 @@ internal sealed class IdeActions(DTE2 dte)
         "setConfiguration" => SetConfiguration(RequireString(args, "configuration")),
         "clean" => Clean(),
         "publish" => Publish(),
+        "prepareKill" => PrepareKill(),
         _ => throw new NotSupportedException($"Unknown action '{action}'."),
     };
 
@@ -329,6 +330,25 @@ internal sealed class IdeActions(DTE2 dte)
     {
         dte.ExecuteCommand("Build.PublishSelection");
         return new { command = "Build.PublishSelection", configuration = dte.Solution.SolutionBuild.ActiveConfiguration?.Name };
+    }
+
+    // Saves every document, then reports any that are still unsaved. The MCP kills the instance only when safe is true.
+    private object PrepareKill()
+    {
+        dte.ExecuteCommand("File.SaveAll");
+
+        var documents = dte.Documents;
+        var unsaved = new List<string>();
+        for (var i = 1; i <= documents.Count; i++)
+        {
+            var doc = documents.Item(i);
+            if (!doc.Saved)
+            {
+                unsaved.Add(doc.FullName);
+            }
+        }
+
+        return new { safe = unsaved.Count == 0, unsaved };
     }
 
     private void RequireBreakMode()

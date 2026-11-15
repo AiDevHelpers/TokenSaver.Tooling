@@ -25,6 +25,10 @@ internal static class TokenSaverMenu
             MenuChild.Command<OpenSettingsCommand>(),
             MenuChild.Command<OpenChatCommand>(),
             MenuChild.Command<StartServerCommand>(),
+            MenuChild.Command<StopServerCommand>(),
+            MenuChild.Command<RestartServerCommand>(),
+            MenuChild.Command<ShowServerStatusCommand>(),
+            MenuChild.Command<ShowLogsCommand>(),
         ],
         Placements = [CommandPlacement.VsctParent(ShellMainMenuGuid, ExtensionsMenuGroupId, priority: 0x0100)],
     };
