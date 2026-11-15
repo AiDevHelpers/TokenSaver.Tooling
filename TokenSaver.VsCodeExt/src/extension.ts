@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { startIdeBridge } from "./ideBridge.js";
 import { spawn } from "child_process";
 import * as net from "node:net";
 import * as path from "path";
@@ -219,6 +220,7 @@ function migrateLegacySettings() {
 
 export async function activate(context: vscode.ExtensionContext) {
     migrateLegacySettings();
+    startIdeBridge(context);
 
     channelTokenSaver = vscode.window.createOutputChannel("TokenSaver");
     channelSimpleModelServer = vscode.window.createOutputChannel("SimpleModelServer");
