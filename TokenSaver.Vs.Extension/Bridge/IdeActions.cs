@@ -30,6 +30,8 @@ internal sealed class IdeActions(DTE2 dte)
         "getBuildDiagnostics" => GetBuildDiagnostics(OptionalString(args, "severity") ?? "all"),
         "codeCleanup" => CodeCleanup(),
         "getOutput" => GetOutput(OptionalString(args, "pane") ?? "Build", OptionalInt(args, "maxLines") ?? 200),
+        "searchOutput" => SearchOutput(OptionalString(args, "pane") ?? "Build", RequireString(args, "pattern")),
+        "clearOutput" => ClearOutput(OptionalString(args, "pane") ?? "Build"),
         "getLocals" => GetLocals(OptionalInt(args, "maxItems") ?? 100),
         "setBreakpoint" => SetBreakpoint(RequireString(args, "file"), RequireInt(args, "line")),
         "removeBreakpoint" => RemoveBreakpoint(RequireString(args, "file"), RequireInt(args, "line")),
@@ -148,6 +150,38 @@ internal sealed class IdeActions(DTE2 dte)
             var lines = text.Split('\n');
             var tail = lines.Skip(Math.Max(0, lines.Length - maxLines));
             return new { pane = pane.Name, lines = tail.Select(l => l.TrimEnd('\r')).ToList() };
+        }
+
+        throw new InvalidOperationException($"No output pane named '{paneName}'.");
+    }
+
+    private object SearchOutput(string paneName, string pattern)
+    {
+        var pane = FindOutputPane(paneName);
+        var doc = pane.TextDocument;
+        var text = doc.StartPoint.CreateEditPoint().GetText(doc.EndPoint);
+        var regex = new System.Text.RegularExpressions.Regex(pattern);
+        var matches = text.Split('\n')
+            .Select(l => l.TrimEnd('\r'))
+            .Where(l => regex.IsMatch(l))
+            .ToList();
+        return new { pane = pane.Name, pattern, match_count = matches.Count, lines = matches };
+    }
+
+    private object ClearOutput(string paneName)
+    {
+        FindOutputPane(paneName).Clear();
+        return new { pane = paneName, cleared = true };
+    }
+
+    private OutputWindowPane FindOutputPane(string paneName)
+    {
+        foreach (OutputWindowPane pane in dte.ToolWindows.OutputWindow.OutputWindowPanes)
+        {
+            if (string.Equals(pane.Name, paneName, StringComparison.OrdinalIgnoreCase))
+            {
+                return pane;
+            }
         }
 
         throw new InvalidOperationException($"No output pane named '{paneName}'.");

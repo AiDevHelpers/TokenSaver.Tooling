@@ -69,6 +69,7 @@ public partial class TokenSaverOptionsControl : UserControl
     internal void LoadMcp(JsonObject root)
     {
         McpAutoRegisterProvidersCheckBox.IsChecked = McpSettingsFile.Get(root, "AutoRegisterProviders")?.GetValue<bool>() ?? true;
+        IdeTestRunDotnetCheckBox.IsChecked = McpSettingsFile.Get(root, "IdeTestRunMode")?.GetValue<string>() == "DotnetTest";
         McpOllamaUrlTextBox.Text = McpSettingsFile.Get(root, "OllamaUrl")?.GetValue<string>() ?? "http://localhost:11435";
         McpOllamaModelTextBox.Text = McpSettingsFile.Get(root, "OllamaModel")?.GetValue<string>() ?? "HelperModel";
         McpServerPortTextBox.Text = (McpSettingsFile.Get(root, "ServerPort")?.GetValue<int>() ?? 11436).ToString(CultureInfo.InvariantCulture);
@@ -95,6 +96,7 @@ public partial class TokenSaverOptionsControl : UserControl
         }
 
         McpSettingsFile.Set(root, "AutoRegisterProviders", JsonValue.Create(McpAutoRegisterProvidersCheckBox.IsChecked ?? true));
+        McpSettingsFile.Set(root, "IdeTestRunMode", JsonValue.Create(IdeTestRunDotnetCheckBox.IsChecked == true ? "DotnetTest" : "TestExplorer"));
         McpSettingsFile.Set(root, "OllamaUrl", JsonValue.Create(McpOllamaUrlTextBox.Text.Trim()));
         McpSettingsFile.Set(root, "OllamaModel", JsonValue.Create(McpOllamaModelTextBox.Text.Trim()));
         McpSettingsFile.Set(root, "ServerPort", JsonValue.Create(port));

@@ -53,6 +53,7 @@
 
         <TextBlock Text="MCP server (saved to ProgramData)" FontWeight="Bold" Margin="0,12,0,4" />
         <CheckBox x:Name="McpAutoRegisterProvidersCheckBox" Content="Auto-register providers" Margin="0,2" />
+        <CheckBox x:Name="IdeTestRunDotnetCheckBox" Content="IDE test runs use dotnet test with TRX (off = Test Explorer)" Margin="0,2" />
         <Grid Margin="0,4">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="140" />
