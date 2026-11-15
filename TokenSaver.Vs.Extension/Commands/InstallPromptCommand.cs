@@ -1,4 +1,3 @@
-using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -24,21 +23,31 @@ public sealed class InstallPromptCommand(VisualStudioExtensibility extensibility
     public override async Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
     {
         ExtensionLog.Logger.LogInfo("Open install prompt requested");
+        var error = Open();
+        if (error is not null)
+        {
+            await ServerControl.ShowAsync(this.Extensibility, error, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Opens the bundled prompt with the default app. Returns an error message, or null on success.</summary>
+    public static string? Open()
+    {
         var path = MsiInstaller.BundledMsiPath(PromptFileName);
         if (!File.Exists(path))
         {
-            await ServerControl.ShowAsync(this.Extensibility, $"TokenSaver install prompt not found at: {path}", cancellationToken).ConfigureAwait(false);
-            return;
+            return $"TokenSaver install prompt not found at: {path}";
         }
 
         try
         {
             using var process = Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+            return null;
         }
         catch (Win32Exception ex)
         {
             ExtensionLog.Logger.LogException(ex);
-            await ServerControl.ShowAsync(this.Extensibility, $"Could not open the install prompt: {ex.Message}. File: {path}", cancellationToken).ConfigureAwait(false);
+            return $"Could not open the install prompt: {ex.Message}. File: {path}";
         }
     }
 }

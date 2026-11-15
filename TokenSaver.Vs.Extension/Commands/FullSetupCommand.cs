@@ -79,8 +79,13 @@ public sealed class FullSetupCommand(VisualStudioExtensibility extensibility) : 
             return;
         }
 
+        // Step 5: open the install prompt now that both services are confirmed up.
+        var promptError = InstallPromptCommand.Open();
         ExtensionLog.Logger.LogInfo("Full setup complete");
-        await ServerControl.ShowAsync(this.Extensibility, "TokenSaver setup complete: SimpleModelServer and TokenSaver MCP are installed and running.", cancellationToken).ConfigureAwait(false);
+        var doneMessage = promptError is null
+            ? "TokenSaver setup complete: SimpleModelServer and TokenSaver MCP are installed and running."
+            : $"TokenSaver setup complete, but the install prompt did not open: {promptError}";
+        await ServerControl.ShowAsync(this.Extensibility, doneMessage, cancellationToken).ConfigureAwait(false);
     }
 
     private Task FailAsync(string message, CancellationToken ct)
