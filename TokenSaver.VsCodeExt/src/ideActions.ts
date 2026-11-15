@@ -1,9 +1,14 @@
+import { spawn, type ChildProcess } from "child_process";
 import * as path from "path";
 import * as vscode from "vscode";
 
 // Common IDE actions for VS Code. The names match the Visual Studio bridge (TokenSaver.Vs.Extension
 // Bridge/IdeActions.cs), so the MCP caller uses the same calls for either IDE. Actions VS Code's API cannot
 // perform throw an "not supported" error instead of guessing, so the caller always knows what happened.
+//
+// Output and watches are kept by this bridge, because VS Code has no API to read other output channels or
+// watch expressions. Output holds the lines from clean and publish runs this bridge started. Watches are
+// evaluated in the active debug session on each listWatches call, so their values only show while paused.
 
 type Args = Record<string, unknown>;
 
@@ -13,12 +18,23 @@ export class UnsupportedActionError extends Error {
     }
 }
 
+const OUTPUT_LIMIT = 5000;
+const outputLines: string[] = [];
+const trackedProcesses = new Map<number, ChildProcess>();
+const watches: string[] = [];
+let selectedConfiguration: string | undefined;
+
 function requireString(args: Args, key: string): string {
     const value = args[key];
     if (typeof value !== "string" || value.length === 0) {
         throw new Error(`Missing required argument '${key}'.`);
     }
     return value;
+}
+
+function optionalString(args: Args, key: string): string | undefined {
+    const value = args[key];
+    return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 function optionalInt(args: Args, key: string): number | undefined {
@@ -42,6 +58,87 @@ function launchConfigurationNames(): string[] {
     return configs.map((c) => c.name ?? "").filter((n) => n.length > 0);
 }
 
+function workspaceRoot(): string {
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!root) {
+        throw new Error("This action needs an open workspace folder.");
+    }
+    return root;
+}
+
+function appendOutput(text: string): void {
+    for (const line of text.split(/\r?\n/)) {
+        if (line.length > 0) {
+            outputLines.push(line);
+        }
+    }
+    if (outputLines.length > OUTPUT_LIMIT) {
+        outputLines.splice(0, outputLines.length - OUTPUT_LIMIT);
+    }
+}
+
+// Runs `dotnet clean` or `dotnet publish` in the workspace folder. Output goes to the bridge's output buffer.
+function runDotnet(verb: "clean" | "publish", project: string | undefined): Promise<unknown> {
+    const cwd = workspaceRoot();
+    const args = project ? [verb, project] : [verb];
+    const command = `dotnet ${args.join(" ")}`;
+    appendOutput(`> ${command}`);
+    return new Promise((resolve, reject) => {
+        const child = spawn("dotnet", args, { cwd, windowsHide: true });
+        const pid = child.pid;
+        if (pid === undefined) {
+            reject(new Error("dotnet did not start."));
+            return;
+        }
+        trackedProcesses.set(pid, child);
+        child.stdout?.on("data", (data: Buffer) => appendOutput(data.toString("utf8")));
+        child.stderr?.on("data", (data: Buffer) => appendOutput(data.toString("utf8")));
+        child.on("error", (err) => {
+            trackedProcesses.delete(pid);
+            reject(err);
+        });
+        child.on("close", (code) => {
+            trackedProcesses.delete(pid);
+            resolve({ ok: code === 0, exit_code: code, command, cwd, pid });
+        });
+    });
+}
+
+// Kills a process tree this bridge started. taskkill /T takes the children that dotnet spawns too.
+function killTracked(pid: number): Promise<unknown> {
+    if (!trackedProcesses.has(pid)) {
+        throw new Error(`Process ${pid} was not started by this bridge; it will not be killed.`);
+    }
+    return new Promise((resolve, reject) => {
+        const killer = spawn("taskkill", ["/T", "/F", "/PID", String(pid)], { windowsHide: true });
+        killer.on("error", reject);
+        killer.on("close", (code) => {
+            trackedProcesses.delete(pid);
+            resolve({ killed: code === 0, pid, exit_code: code });
+        });
+    });
+}
+
+async function evaluateWatches(): Promise<Array<Record<string, unknown>>> {
+    const session = vscode.debug.activeDebugSession;
+    const frame = vscode.debug.activeStackItem;
+    const frameId = frame && "frameId" in frame ? frame.frameId : undefined;
+    const results: Array<Record<string, unknown>> = [];
+    for (const expression of watches) {
+        if (!session) {
+            results.push({ expression, error: "No active debug session." });
+            continue;
+        }
+        try {
+            const reply = await session.customRequest("evaluate", { expression, frameId, context: "watch" });
+            results.push({ expression, value: reply.result, type: reply.type ?? null });
+        } catch (err) {
+            results.push({ expression, error: err instanceof Error ? err.message : String(err) });
+        }
+    }
+    return results;
+}
+
 export async function runIdeAction(action: string, args: Args): Promise<unknown> {
     switch (action) {
         case "status":
@@ -53,7 +150,7 @@ export async function runIdeAction(action: string, args: Args): Promise<unknown>
 
         case "startDebugging": {
             const folder = vscode.workspace.workspaceFolders?.[0];
-            const name = typeof args.configuration === "string" ? args.configuration : launchConfigurationNames()[0];
+            const name = optionalString(args, "configuration") ?? selectedConfiguration ?? launchConfigurationNames()[0];
             if (!name) {
                 throw new Error("No launch configuration found in launch.json.");
             }
@@ -79,6 +176,27 @@ export async function runIdeAction(action: string, args: Args): Promise<unknown>
         case "build":
             await vscode.commands.executeCommand("workbench.action.tasks.build");
             return { command: "workbench.action.tasks.build" };
+
+        case "clean":
+            return runDotnet("clean", optionalString(args, "project"));
+
+        case "publish":
+            return runDotnet("publish", optionalString(args, "project"));
+
+        case "getOutput": {
+            const maxLines = optionalInt(args, "maxLines") ?? 200;
+            return { count: Math.min(maxLines, outputLines.length), lines: outputLines.slice(-maxLines) };
+        }
+
+        case "searchOutput": {
+            const pattern = new RegExp(requireString(args, "pattern"));
+            const lines = outputLines.filter((line) => pattern.test(line));
+            return { count: lines.length, lines };
+        }
+
+        case "clearOutput":
+            outputLines.length = 0;
+            return { cleared: true };
 
         case "getBuildDiagnostics": {
             const severity = typeof args.severity === "string" ? args.severity : "all";
@@ -171,6 +289,26 @@ export async function runIdeAction(action: string, args: Args): Promise<unknown>
             return { expression, result: reply.result, type: reply.type ?? null };
         }
 
+        case "addWatch": {
+            const expression = requireString(args, "expression");
+            if (!watches.includes(expression)) {
+                watches.push(expression);
+            }
+            return { added: expression, count: watches.length };
+        }
+
+        case "removeWatch": {
+            const expression = requireString(args, "expression");
+            const index = watches.indexOf(expression);
+            if (index >= 0) {
+                watches.splice(index, 1);
+            }
+            return { removed: index >= 0, count: watches.length };
+        }
+
+        case "listWatches":
+            return { count: watches.length, watches: await evaluateWatches() };
+
         case "getLocals": {
             const session = vscode.debug.activeDebugSession;
             const frame = vscode.debug.activeStackItem;
@@ -189,21 +327,27 @@ export async function runIdeAction(action: string, args: Args): Promise<unknown>
         }
 
         case "listConfigurations":
-            return { configurations: launchConfigurationNames() };
+            return { configurations: launchConfigurationNames(), selected: selectedConfiguration ?? null };
+
+        case "setConfiguration": {
+            const configuration = requireString(args, "configuration");
+            if (!launchConfigurationNames().includes(configuration)) {
+                throw new Error(`No launch configuration named '${configuration}' in launch.json.`);
+            }
+            selectedConfiguration = configuration;
+            return { configuration };
+        }
+
+        case "killProcess": {
+            const pid = optionalInt(args, "pid");
+            if (pid === undefined) throw new Error("Missing required argument 'pid'.");
+            return killTracked(pid);
+        }
 
         case "health":
             return { ide: "VsCode" };
 
         case "setStartupProject":
-        case "setConfiguration":
-        case "clean":
-        case "publish":
-        case "getOutput":
-        case "searchOutput":
-        case "clearOutput":
-        case "addWatch":
-        case "removeWatch":
-        case "listWatches":
         case "prepareKill":
             throw new UnsupportedActionError(action);
 
