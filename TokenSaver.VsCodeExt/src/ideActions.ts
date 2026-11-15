@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from "child_process";
 import * as path from "path";
 import * as vscode from "vscode";
 import { OutputBuffer } from "./outputBuffer.js";
+import { debugOutputStore } from "./debugOutputTracker.js";
 
 // Common IDE actions for VS Code. The names match the Visual Studio bridge (TokenSaver.Vs.Extension
 // Bridge/IdeActions.cs), so the MCP caller uses the same calls for either IDE. Actions VS Code's API cannot
@@ -197,6 +198,30 @@ export async function runIdeAction(action: string, args: Args): Promise<unknown>
         case "clearOutput":
             output.clear();
             return { cleared: true };
+
+        case "listDebugSessions":
+            return {
+                sessions: debugOutputStore.sessionIds().map((id) => ({ id, ended: debugOutputStore.isEnded(id) })),
+                endedRuns: debugOutputStore.endedSessions(),
+            };
+
+        case "getDebugOutput": {
+            const session = requireString(args, "session");
+            const fromSeq = optionalInt(args, "fromSeq") ?? 1;
+            const maxLines = optionalInt(args, "maxLines") ?? 200;
+            const buffer = debugOutputStore.output(session);
+            if (buffer === undefined) {
+                return { count: 0, lines: [], nextSeq: fromSeq, dropped: 0, ended: debugOutputStore.isEnded(session) };
+            }
+            const page = buffer.read(fromSeq, maxLines);
+            return {
+                count: page.lines.length,
+                lines: page.lines,
+                nextSeq: page.nextSeq,
+                dropped: page.dropped,
+                ended: debugOutputStore.isEnded(session),
+            };
+        }
 
         case "getBuildDiagnostics": {
             const severity = typeof args.severity === "string" ? args.severity : "all";

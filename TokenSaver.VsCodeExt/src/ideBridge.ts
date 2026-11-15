@@ -4,6 +4,7 @@ import * as path from "path";
 import * as vscode from "vscode";
 
 import { runIdeAction, UnsupportedActionError } from "./ideActions.js";
+import { registerDebugOutputTracker } from "./debugOutputTracker.js";
 
 // Named-pipe bridge for this VS Code window, mirroring the Visual Studio bridge. Each request is one JSON line
 // {"action":"...","args":{...}}; each reply is one JSON line {"ok":true,"pid":N,"result":...} or
@@ -145,6 +146,7 @@ let bridge: IdeBridge | undefined;
 
 /** Starts the IDE bridge for this window. Called once from activate(). Disposed with the extension. */
 export function startIdeBridge(context: vscode.ExtensionContext): void {
+    registerDebugOutputTracker(context);
     if (bridge) return;
     bridge = new IdeBridge();
     bridge.start();
