@@ -47,8 +47,14 @@ internal sealed class IdeActions(DTE2 dte)
         "clean" => Clean(),
         "publish" => Publish(),
         "prepareKill" => PrepareKill(),
+        "killProcess" => KillProcess(RequireInt(args, "pid")),
         _ => throw new NotSupportedException($"Unknown action '{action}'."),
     };
+
+    // Clean and publish run through the IDE's build, not a child process this bridge starts, so no process is
+    // tracked here. Every pid is refused; only processes the bridge started may be killed.
+    private object KillProcess(int pid) =>
+        throw new InvalidOperationException($"Process {pid} was not started by this bridge; it will not be killed.");
 
     private object SetStartupProject(string projectName)
     {
