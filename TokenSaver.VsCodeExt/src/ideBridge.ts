@@ -5,6 +5,7 @@ import * as vscode from "vscode";
 
 import { runIdeAction, UnsupportedActionError } from "./ideActions.js";
 import { registerDebugOutputTracker } from "./debugOutputTracker.js";
+import { exthostLogRoot } from "./logRoots.js";
 
 // Named-pipe bridge for this VS Code window, mirroring the Visual Studio bridge. Each request is one JSON line
 // {"action":"...","args":{...}}; each reply is one JSON line {"ok":true,"pid":N,"result":...} or
@@ -39,6 +40,12 @@ class IdeBridge implements vscode.Disposable {
     private watchdog: NodeJS.Timeout | undefined;
     private readonly pid = process.pid;
     private readonly pipeName = pipeNameFor(process.pid);
+    private readonly logRoots: string[];
+
+    constructor(extensionLogPath: string) {
+        const root = exthostLogRoot(extensionLogPath, vscode.env.remoteName);
+        this.logRoots = root ? [root] : [];
+    }
 
     start(): void {
         this.listen();
@@ -85,6 +92,7 @@ class IdeBridge implements vscode.Disposable {
             solutionPath,
             updatedUtc: new Date().toISOString(),
             ide: "VsCode",
+            logRoots: this.logRoots,
         };
         const target = manifestPath(this.pid);
         const temp = `${target}.tmp`;
@@ -148,7 +156,7 @@ let bridge: IdeBridge | undefined;
 export function startIdeBridge(context: vscode.ExtensionContext): void {
     registerDebugOutputTracker(context);
     if (bridge) return;
-    bridge = new IdeBridge();
+    bridge = new IdeBridge(context.logUri.fsPath);
     bridge.start();
     context.subscriptions.push(bridge);
 }
