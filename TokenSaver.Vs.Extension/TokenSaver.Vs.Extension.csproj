@@ -44,6 +44,23 @@
     <PackageReference Include="SperryDev.Logger" Version="$(SperryLoggerVersion)" />
   </ItemGroup>
 
+  <!-- Service installers bundled beside the extension (install/uninstall commands run them via msiexec).
+       TokenSaver-Setup.msi is built by scripts/build-vsix.ps1 (VS Code extension) into this path. The
+       SimpleModelServer MSI comes from its own repo and is copied in the same way when present. Each item is
+       skipped when its MSI is absent, so the build still succeeds without them. -->
+  <ItemGroup>
+    <Content Include="..\TokenSaver.VsCodeExt\bin\TokenSaver.Setup\TokenSaver-Setup.msi"
+             Link="TokenSaver-Setup.msi"
+             Condition="Exists('..\TokenSaver.VsCodeExt\bin\TokenSaver.Setup\TokenSaver-Setup.msi')"
+             CopyToOutputDirectory="PreserveNewest"
+             IncludeInVSIX="true" />
+    <Content Include="..\TokenSaver.VsCodeExt\bin\SimpleModelServer.Setup\SimpleModelServer-Setup.msi"
+             Link="SimpleModelServer-Setup.msi"
+             Condition="Exists('..\TokenSaver.VsCodeExt\bin\SimpleModelServer.Setup\SimpleModelServer-Setup.msi')"
+             CopyToOutputDirectory="PreserveNewest"
+             IncludeInVSIX="true" />
+  </ItemGroup>
+
   <!-- Override the repo-wide Nerdbank.GitVersioning (3.9.50, injected by Directory.Build.props)
        up to 3.10.91 via Update so there is no duplicate PackageReference. -->
   <ItemGroup>

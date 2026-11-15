@@ -29,6 +29,10 @@ internal static class TokenSaverMenu
             MenuChild.Command<RestartServerCommand>(),
             MenuChild.Command<ShowServerStatusCommand>(),
             MenuChild.Command<ShowLogsCommand>(),
+            MenuChild.Command<InstallMcpServiceCommand>(),
+            MenuChild.Command<UninstallMcpServiceCommand>(),
+            MenuChild.Command<InstallSimpleModelServerCommand>(),
+            MenuChild.Command<UninstallSimpleModelServerCommand>(),
         ],
         Placements = [CommandPlacement.VsctParent(ShellMainMenuGuid, ExtensionsMenuGroupId, priority: 0x0100)],
     };
