@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from "child_process";
 import * as path from "path";
 import * as vscode from "vscode";
+import { OutputBuffer } from "./outputBuffer.js";
 
 // Common IDE actions for VS Code. The names match the Visual Studio bridge (TokenSaver.Vs.Extension
 // Bridge/IdeActions.cs), so the MCP caller uses the same calls for either IDE. Actions VS Code's API cannot
@@ -19,7 +20,7 @@ export class UnsupportedActionError extends Error {
 }
 
 const OUTPUT_LIMIT = 5000;
-const outputLines: string[] = [];
+const output = new OutputBuffer(OUTPUT_LIMIT);
 const trackedProcesses = new Map<number, ChildProcess>();
 const watches: string[] = [];
 let selectedConfiguration: string | undefined;
@@ -67,14 +68,7 @@ function workspaceRoot(): string {
 }
 
 function appendOutput(text: string): void {
-    for (const line of text.split(/\r?\n/)) {
-        if (line.length > 0) {
-            outputLines.push(line);
-        }
-    }
-    if (outputLines.length > OUTPUT_LIMIT) {
-        outputLines.splice(0, outputLines.length - OUTPUT_LIMIT);
-    }
+    output.append(text);
 }
 
 // Runs `dotnet clean` or `dotnet publish` in the workspace folder. Output goes to the bridge's output buffer.
@@ -82,7 +76,7 @@ function runDotnet(verb: "clean" | "publish", project: string | undefined): Prom
     const cwd = workspaceRoot();
     const args = project ? [verb, project] : [verb];
     const command = `dotnet ${args.join(" ")}`;
-    appendOutput(`> ${command}`);
+    appendOutput(`> ${command}\n`);
     return new Promise((resolve, reject) => {
         const child = spawn("dotnet", args, { cwd, windowsHide: true });
         const pid = child.pid;
@@ -185,17 +179,23 @@ export async function runIdeAction(action: string, args: Args): Promise<unknown>
 
         case "getOutput": {
             const maxLines = optionalInt(args, "maxLines") ?? 200;
-            return { count: Math.min(maxLines, outputLines.length), lines: outputLines.slice(-maxLines) };
+            const fromSeq = optionalInt(args, "fromSeq");
+            if (fromSeq === undefined) {
+                const tail = output.tail(maxLines);
+                return { count: tail.length, lines: tail };
+            }
+            const page = output.read(fromSeq, maxLines);
+            return { count: page.lines.length, lines: page.lines, nextSeq: page.nextSeq, dropped: page.dropped };
         }
 
         case "searchOutput": {
             const pattern = new RegExp(requireString(args, "pattern"));
-            const lines = outputLines.filter((line) => pattern.test(line));
+            const lines = output.read(1, Number.MAX_SAFE_INTEGER).lines.filter((line) => pattern.test(line));
             return { count: lines.length, lines };
         }
 
         case "clearOutput":
-            outputLines.length = 0;
+            output.clear();
             return { cleared: true };
 
         case "getBuildDiagnostics": {
