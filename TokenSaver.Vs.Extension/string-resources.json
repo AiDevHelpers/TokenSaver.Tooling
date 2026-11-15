@@ -1,0 +1,14 @@
+{
+  "ToggleAutoWorkflow.DisplayName": "Toggle TokenSaver Auto-Workflow",
+  "FullSetup.DisplayName": "Run TokenSaver Full Setup",
+  "InstallPrompt.DisplayName": "Open TokenSaver Install Prompt",
+  "StopServer.DisplayName": "Stop TokenSaver MCP Server",
+  "RestartServer.DisplayName": "Restart TokenSaver MCP Server",
+  "ShowStatus.DisplayName": "Show TokenSaver Status",
+  "ShowLogs.DisplayName": "Show TokenSaver Logs",
+  "InstallMcpService.DisplayName": "Install TokenSaver MCP Service",
+  "UninstallMcpService.DisplayName": "Uninstall TokenSaver MCP Service",
+  "InstallSimpleModelServer.DisplayName": "Install SimpleModelServer Service",
+  "UninstallSimpleModelServer.DisplayName": "Uninstall SimpleModelServer Service",
+  "StartServer.DisplayName": "Start TokenSaver MCP Server"
+}

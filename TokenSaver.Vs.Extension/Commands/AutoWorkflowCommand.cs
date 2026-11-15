@@ -16,7 +16,7 @@ namespace TokenSaver.Vs.Extension.Commands;
 [VisualStudioContribution]
 public sealed class ToggleAutoWorkflowCommand(VisualStudioExtensibility extensibility) : Command(extensibility)
 {
-    public override CommandConfiguration CommandConfiguration => new("Toggle TokenSaver Auto-Workflow");
+    public override CommandConfiguration CommandConfiguration => new("%ToggleAutoWorkflow.DisplayName%");
 
     public override async Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
     {

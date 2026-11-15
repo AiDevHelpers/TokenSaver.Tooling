@@ -113,20 +113,24 @@ public static class BehaviorConfigManager
             Autostart = global?.Autostart ?? true,
             VerboseLogging = global?.VerboseLogging ?? false,
             AutoWorkflow = global?.AutoWorkflow ?? false,
-            Server = new ExtensionServerConfig
-            {
-                Port = global?.Server?.Port ?? 11436,
-                StartTimeout = global?.Server?.StartTimeout ?? 30,
-                IdleTimeout = global?.Server?.IdleTimeout ?? 0,
-            },
-            SimpleModelServer = new ExtensionSimpleModelServerConfig
-            {
-                ExePath = global?.SimpleModelServer?.ExePath ?? "",
-                HealthUrl = global?.SimpleModelServer?.HealthUrl ?? new Uri("http://localhost:11435/health"),
-                StartTimeout = global?.SimpleModelServer?.StartTimeout ?? 600,
-            },
+            Server = ServerDefaults(global?.Server),
+            SimpleModelServer = SimpleModelServerDefaults(global?.SimpleModelServer),
         };
     }
+
+    private static ExtensionServerConfig ServerDefaults(ExtensionServerConfig? server) => new()
+    {
+        Port = server?.Port ?? 11436,
+        StartTimeout = server?.StartTimeout ?? 30,
+        IdleTimeout = server?.IdleTimeout ?? 0,
+    };
+
+    private static ExtensionSimpleModelServerConfig SimpleModelServerDefaults(ExtensionSimpleModelServerConfig? simpleModelServer) => new()
+    {
+        ExePath = simpleModelServer?.ExePath ?? "",
+        HealthUrl = simpleModelServer?.HealthUrl ?? new Uri("http://localhost:11435/health"),
+        StartTimeout = simpleModelServer?.StartTimeout ?? 600,
+    };
 
     /// <summary>Persists <paramref name="settings" /> to the global (%ProgramData%) config file, leaving the rest of the file untouched.</summary>
     public static void SaveExtensionSettings(ExtensionBehaviorConfig settings)

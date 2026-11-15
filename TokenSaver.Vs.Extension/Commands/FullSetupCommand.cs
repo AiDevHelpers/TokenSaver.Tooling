@@ -26,7 +26,7 @@ public sealed class FullSetupCommand(VisualStudioExtensibility extensibility) : 
     private static readonly TimeSpan McpTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(2);
 
-    public override CommandConfiguration CommandConfiguration => new("Run TokenSaver Full Setup");
+    public override CommandConfiguration CommandConfiguration => new("%FullSetup.DisplayName%");
 
     public override async Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
     {

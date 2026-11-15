@@ -18,7 +18,7 @@ public sealed class InstallPromptCommand(VisualStudioExtensibility extensibility
 {
     public const string PromptFileName = "INSTALL_PROMPT.md";
 
-    public override CommandConfiguration CommandConfiguration => new("Open TokenSaver Install Prompt");
+    public override CommandConfiguration CommandConfiguration => new("%InstallPrompt.DisplayName%");
 
     public override async Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
     {

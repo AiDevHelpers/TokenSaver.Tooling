@@ -42,6 +42,7 @@
     <PackageReference Include="EnvDTE" Version="17.14.40260" />
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="8.0.1" />
     <PackageReference Include="SperryDev.Logger" Version="$(SperryLoggerVersion)" />
+    <PackageReference Include="MessagePack" Version="2.5.307" />
   </ItemGroup>
 
   <!-- Service installers bundled beside the extension (install/uninstall commands run them via msiexec).

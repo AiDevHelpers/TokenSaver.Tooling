@@ -13,12 +13,21 @@ namespace TokenSaver.Vs.Extension.Bridge;
 /// Implements the common IDE actions over the EnvDTE automation object. Must run on the Visual Studio UI thread.
 /// Every action returns a result object or throws; <see cref="BridgeServer"/> turns exceptions into an error reply.
 /// </summary>
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "VSTHRD010:Invoke main-thread members",
+    Justification = "Every entry point runs on the UI thread: TokenSaverPackage switches to it before calling Invoke, and Invoke asserts it with ThreadHelper.ThrowIfNotOnUIThread.")]
 internal sealed class IdeActions(DTE2 dte)
 {
     // Watch expressions for this instance. Kept here (not in the Watch window) and evaluated on read.
     private readonly List<string> _watches = [];
 
-    public object Invoke(string action, JsonElement args) => action switch
+    public object Invoke(string action, JsonElement args)
+    {
+        // Callers switch to the UI thread first (TokenSaverPackage); this asserts it at runtime.
+        Microsoft.VisualStudio.Shell.ThreadHelper.ThrowIfNotOnUIThread();
+        return InvokeOnUiThread(action, args);
+    }
+
+    private object InvokeOnUiThread(string action, JsonElement args) => action switch
     {
         "status" => new { solution_path = NullIfEmpty(dte.Solution?.FullName) },
         "setStartupProject" => SetStartupProject(RequireString(args, "project")),
@@ -106,7 +115,7 @@ internal sealed class IdeActions(DTE2 dte)
     // vsBuildErrorLevel: 1 = error, 2 = warning (per EnvDTE); other levels are excluded.
     private object GetBuildDiagnostics(string severity)
     {
-        var wanted = severity.ToLowerInvariant();
+        var wanted = severity;
         var items = new List<object>();
         var errors = dte.ToolWindows.ErrorList.ErrorItems;
         for (var i = 1; i <= errors.Count; i++)
@@ -119,7 +128,7 @@ internal sealed class IdeActions(DTE2 dte)
                 _ => null,
             };
 
-            if (kind is null || (wanted != "all" && wanted != kind + "s" && wanted != kind))
+            if (kind is null || (!string.Equals(wanted, "all", StringComparison.OrdinalIgnoreCase) && !string.Equals(wanted, kind + "s", StringComparison.OrdinalIgnoreCase) && !string.Equals(wanted, kind, StringComparison.OrdinalIgnoreCase)))
             {
                 continue;
             }
@@ -255,15 +264,15 @@ internal sealed class IdeActions(DTE2 dte)
 
     private object Step(string mode)
     {
-        switch (mode.ToLowerInvariant())
+        switch (mode.ToUpperInvariant())
         {
-            case "over":
+            case "OVER":
                 dte.Debugger.StepOver(false);
                 break;
-            case "into":
+            case "INTO":
                 dte.Debugger.StepInto(false);
                 break;
-            case "out":
+            case "OUT":
                 dte.Debugger.StepOut(false);
                 break;
             default:
@@ -320,11 +329,11 @@ internal sealed class IdeActions(DTE2 dte)
         {
             if (!breakMode)
             {
-                return new { expression, valid = false, value = (string?)null, type = (string?)null, reason = "not stopped at a breakpoint" };
+                return new { expression, valid = false, value = (string?)null, type = (string?)null, reason = (string?)"not stopped at a breakpoint" };
             }
 
             var result = dte.Debugger.GetExpression(expression, false, 5000);
-            return new { expression, valid = result.IsValidValue, value = result.Value, type = result.Type, reason = (string?)null };
+            return new { expression, valid = result.IsValidValue, value = (string?)result.Value, type = (string?)result.Type, reason = (string?)null };
         }).ToList();
 
         return new { count = items.Count, watches = items };

@@ -27,7 +27,7 @@ namespace TokenSaver.Vs.Extension.Options;
 [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
 [Guid(PackageGuidString)]
 [ProvideOptionPage(typeof(TokenSaverOptionsPage), "TokenSaver", "General", 0, 0, supportsAutomation: true)]
-public sealed class TokenSaverPackage : AsyncPackage
+public sealed class TokenSaverPackage : AsyncPackage, IDisposable
 {
     public const string PackageGuidString = "34c83c12-40e0-4c22-bf7e-f6f2f2a16636";
 
@@ -38,13 +38,20 @@ public sealed class TokenSaverPackage : AsyncPackage
     private volatile string? _solutionPath;
     private System.Threading.Timer? _watchdog;
 
+    /// <summary>Stops the bridge and the watchdog timer.</summary>
+    public void Dispose()
+    {
+        _bridge?.Dispose();
+        _watchdog?.Dispose();
+    }
+
     protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
     {
         var logger = ExtensionLog.Logger;
         logger.LogInfo("TokenSaver package initialized");
 
         await JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
-        var dte = (DTE2)await GetServiceAsync(typeof(DTE));
+        var dte = (DTE2?)await GetServiceAsync(typeof(DTE)) ?? throw new InvalidOperationException("Visual Studio DTE service is unavailable.");
 
         var pid = Environment.ProcessId;
         _solutionPath = NullIfEmpty(dte.Solution?.FullName);
@@ -68,8 +75,10 @@ public sealed class TokenSaverPackage : AsyncPackage
         _watchdog = new System.Threading.Timer(_ => Watchdog(pid), null, WatchdogInterval, WatchdogInterval);
 
         _solutionEvents = dte.Events.SolutionEvents;
+#pragma warning disable VSTHRD010 // DTE solution events are raised on the UI thread.
         _solutionEvents.Opened += () => UpdateSolutionPath(dte.Solution?.FullName);
         _solutionEvents.AfterClosing += () => UpdateSolutionPath(null);
+#pragma warning restore VSTHRD010
 
         AppDomain.CurrentDomain.ProcessExit += (_, _) => InstanceRegistry.Remove(pid);
     }

@@ -143,5 +143,9 @@ internal sealed class BridgeServer : IDisposable
 
     private static TimeSpan Min(TimeSpan a, TimeSpan b) => a <= b ? a : b;
 
-    public void Dispose() => _cts.Cancel();
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
+    }
 }
