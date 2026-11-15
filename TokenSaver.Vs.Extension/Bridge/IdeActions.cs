@@ -38,7 +38,8 @@ internal sealed class IdeActions(DTE2 dte)
         "build" => Build(),
         "getBuildDiagnostics" => GetBuildDiagnostics(OptionalString(args, "severity") ?? "all"),
         "codeCleanup" => CodeCleanup(),
-        "getOutput" => GetOutput(OptionalString(args, "pane") ?? "Build", OptionalInt(args, "maxLines") ?? 200),
+        "getOutput" => GetOutput(OptionalString(args, "pane") ?? "Build", OptionalInt(args, "maxLines") ?? 200, OptionalInt(args, "fromOffset"), OptionalInt(args, "maxChars") ?? 20000, OptionalString(args, "anchor")),
+        "listOutputPanes" => ListOutputPanes(),
         "searchOutput" => SearchOutput(OptionalString(args, "pane") ?? "Build", RequireString(args, "pattern")),
         "clearOutput" => ClearOutput(OptionalString(args, "pane") ?? "Build"),
         "getLocals" => GetLocals(OptionalInt(args, "maxItems") ?? 100),
@@ -151,7 +152,7 @@ internal sealed class IdeActions(DTE2 dte)
         return new { document = dte.ActiveDocument.FullName };
     }
 
-    private object GetOutput(string paneName, int maxLines)
+    private object GetOutput(string paneName, int maxLines, int? fromOffset = null, int maxChars = 20000, string? anchor = null)
     {
         foreach (OutputWindowPane pane in dte.ToolWindows.OutputWindow.OutputWindowPanes)
         {
@@ -162,12 +163,29 @@ internal sealed class IdeActions(DTE2 dte)
 
             var doc = pane.TextDocument;
             var text = doc.StartPoint.CreateEditPoint().GetText(doc.EndPoint);
+            if (fromOffset is int offset)
+            {
+                var slice = OutputPaneSlice.Slice(text, offset, maxChars, anchor);
+                return new { pane = pane.Name, text = slice.Text, nextOffset = slice.NextOffset, anchor = slice.Anchor, reset = slice.Reset };
+            }
+
             var lines = text.Split('\n');
             var tail = lines.Skip(Math.Max(0, lines.Length - maxLines));
             return new { pane = pane.Name, lines = tail.Select(l => l.TrimEnd('\r')).ToList() };
         }
 
         throw new InvalidOperationException($"No output pane named '{paneName}'.");
+    }
+
+    private object ListOutputPanes()
+    {
+        var names = new List<string>();
+        foreach (OutputWindowPane pane in dte.ToolWindows.OutputWindow.OutputWindowPanes)
+        {
+            names.Add(pane.Name);
+        }
+
+        return new { count = names.Count, panes = names };
     }
 
     private object SearchOutput(string paneName, string pattern)
