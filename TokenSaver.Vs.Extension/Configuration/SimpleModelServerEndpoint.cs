@@ -17,13 +17,12 @@ internal static class SimpleModelServerEndpoint
             try
             {
                 var healthUrl = BehaviorConfigManager.GetExtensionSettings().SimpleModelServer?.HealthUrl;
-                if (string.IsNullOrWhiteSpace(healthUrl))
+                if (healthUrl is null || !healthUrl.IsAbsoluteUri)
                 {
                     return Fallback;
                 }
 
-                var uri = new Uri(healthUrl, UriKind.Absolute);
-                return new Uri($"{uri.Scheme}://{uri.Authority}");
+                return new Uri($"{healthUrl.Scheme}://{healthUrl.Authority}");
             }
             catch (UriFormatException)
             {

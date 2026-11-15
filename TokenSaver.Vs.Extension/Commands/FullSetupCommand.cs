@@ -97,7 +97,7 @@ public sealed class FullSetupCommand(VisualStudioExtensibility extensibility) : 
     private static string SimpleModelServerHealthUrl()
     {
         var url = BehaviorConfigManager.GetExtensionSettings().SimpleModelServer?.HealthUrl;
-        return string.IsNullOrWhiteSpace(url) ? FallbackHealthUrl : url;
+        return url is null ? FallbackHealthUrl : url.ToString();
     }
 
     private static async Task<bool> WaitForHealthyAsync(string url, TimeSpan timeout, CancellationToken ct)

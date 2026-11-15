@@ -12,6 +12,7 @@ namespace TokenSaver.Vs.Extension;
 /// display and install the extension without loading this assembly.
 /// </summary>
 [VisualStudioContribution]
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes", Justification = "Instantiated by the Visual Studio extension host via reflection.")]
 internal sealed class ExtensionEntrypoint : global::Microsoft.VisualStudio.Extensibility.Extension
 {
     /// <inheritdoc/>

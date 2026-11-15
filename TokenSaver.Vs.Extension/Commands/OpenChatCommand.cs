@@ -1,3 +1,4 @@
+#pragma warning disable CEE0027 // Command and menu text is not localised in this release; tracked separately.
 using System.Threading;
 using System.Threading.Tasks;
 

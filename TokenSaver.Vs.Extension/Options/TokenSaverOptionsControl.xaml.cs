@@ -24,7 +24,7 @@ public partial class TokenSaverOptionsControl : UserControl
         StartTimeoutTextBox.Text = (settings.Server?.StartTimeout ?? 30).ToString(CultureInfo.InvariantCulture);
         IdleTimeoutTextBox.Text = (settings.Server?.IdleTimeout ?? 0).ToString(CultureInfo.InvariantCulture);
         SimpleModelServerExePathTextBox.Text = settings.SimpleModelServer?.ExePath ?? "";
-        SimpleModelServerHealthUrlTextBox.Text = settings.SimpleModelServer?.HealthUrl ?? "http://localhost:11435/health";
+        SimpleModelServerHealthUrlTextBox.Text = settings.SimpleModelServer?.HealthUrl?.ToString() ?? "http://localhost:11435/health";
         SimpleModelServerStartTimeoutTextBox.Text = (settings.SimpleModelServer?.StartTimeout ?? 600).ToString(CultureInfo.InvariantCulture);
         StatusTextBlock.Text = string.Empty;
     }
@@ -57,7 +57,7 @@ public partial class TokenSaverOptionsControl : UserControl
             SimpleModelServer = new ExtensionSimpleModelServerConfig
             {
                 ExePath = SimpleModelServerExePathTextBox.Text.Trim(),
-                HealthUrl = SimpleModelServerHealthUrlTextBox.Text.Trim(),
+                HealthUrl = Uri.TryCreate(SimpleModelServerHealthUrlTextBox.Text.Trim(), UriKind.Absolute, out var healthUri) ? healthUri : null,
                 StartTimeout = simpleModelServerStartTimeout,
             },
         };
