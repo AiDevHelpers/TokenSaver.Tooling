@@ -52,6 +52,10 @@ public sealed record ExtensionBehaviorConfig
     [JsonPropertyName("verboseLogging")]
     public bool? VerboseLogging { get; init; }
 
+    /// <summary>Visual Studio-only auto-workflow switch. The server never reads this section, so it changes nothing there.</summary>
+    [JsonPropertyName("autoWorkflow")]
+    public bool? AutoWorkflow { get; init; }
+
     [JsonPropertyName("server")]
     public ExtensionServerConfig? Server { get; init; }
 
@@ -108,6 +112,7 @@ public static class BehaviorConfigManager
         {
             Autostart = global?.Autostart ?? true,
             VerboseLogging = global?.VerboseLogging ?? false,
+            AutoWorkflow = global?.AutoWorkflow ?? false,
             Server = new ExtensionServerConfig
             {
                 Port = global?.Server?.Port ?? 11436,

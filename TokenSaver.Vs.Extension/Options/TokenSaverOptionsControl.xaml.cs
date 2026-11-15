@@ -19,6 +19,7 @@ public partial class TokenSaverOptionsControl : UserControl
     {
         AutostartCheckBox.IsChecked = settings.Autostart ?? true;
         VerboseLoggingCheckBox.IsChecked = settings.VerboseLogging ?? false;
+        AutoWorkflowCheckBox.IsChecked = settings.AutoWorkflow ?? false;
         PortTextBox.Text = (settings.Server?.Port ?? 11436).ToString(CultureInfo.InvariantCulture);
         StartTimeoutTextBox.Text = (settings.Server?.StartTimeout ?? 30).ToString(CultureInfo.InvariantCulture);
         IdleTimeoutTextBox.Text = (settings.Server?.IdleTimeout ?? 0).ToString(CultureInfo.InvariantCulture);
@@ -46,6 +47,7 @@ public partial class TokenSaverOptionsControl : UserControl
         {
             Autostart = AutostartCheckBox.IsChecked ?? true,
             VerboseLogging = VerboseLoggingCheckBox.IsChecked ?? false,
+            AutoWorkflow = AutoWorkflowCheckBox.IsChecked ?? false,
             Server = new ExtensionServerConfig
             {
                 Port = port,

@@ -6,6 +6,7 @@
         <TextBlock Text="Server" FontWeight="Bold" Margin="0,0,0,4" />
         <CheckBox x:Name="AutostartCheckBox" Content="Automatically start the TokenSaver MCP server" Margin="0,2" />
         <CheckBox x:Name="VerboseLoggingCheckBox" Content="Verbose logging" Margin="0,2" />
+        <CheckBox x:Name="AutoWorkflowCheckBox" Content="Auto-workflow (Visual Studio only; does not change the server)" Margin="0,2" />
 
         <Grid Margin="0,4">
             <Grid.ColumnDefinitions>
