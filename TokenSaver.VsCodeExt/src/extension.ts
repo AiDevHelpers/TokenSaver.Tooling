@@ -26,7 +26,6 @@ let stdoutLineBuffer = "";
 // Mirrors the equivalent SimpleModelServer service-mode handling below.
 const TOKENSAVER_SERVICE_NAME = "TokenSaverMCP";
 let usingTokenSaverWindowsService = false;
-let cachedTokenSaverExePath = "";
 
 // Windows service log polling (TokenSaverMCP)
 let tokenSaverServiceLogPoller: ReturnType<typeof setTimeout> | null = null;
@@ -48,7 +47,6 @@ const SIMPLEMODEL_SERVER_EVENT_LOG_SOURCE = "SimpleModelServer";
 // In this mode we do not spawn/kill a child process; we use sc.exe to start/stop.
 const SIMPLEMODEL_SERVER_SERVICE_NAME = "SimpleModelServer";
 let usingSimpleModelServerWindowsService = false;
-let cachedSimpleModelServerExePath = "";
 
 // ─── .tokensaver/config.json behavior config ─────────────────────────────────
 //
@@ -249,7 +247,7 @@ export async function activate(context: vscode.ExtensionContext) {
         channelSimpleModelServer,
         vscode.commands.registerCommand("tokenSaver.startServer", async () => {
             await startSimpleModelServer(context);
-            await startServer(context);
+            await startServer();
         }),
         vscode.commands.registerCommand("tokenSaver.stopServer", async () => {
             await stopServer();
@@ -267,7 +265,7 @@ export async function activate(context: vscode.ExtensionContext) {
         }),
         vscode.commands.registerCommand("tokenSaver.showStatus", async () => {
             await startSimpleModelServer(context);
-            await startServer(context);
+            await startServer();
             showStatusInLog();
         }),
         vscode.commands.registerCommand("tokenSaver.installService", async () => {
@@ -349,8 +347,8 @@ export async function activate(context: vscode.ExtensionContext) {
         .get<boolean>("autostart", true);
     if (autostart) {
         await startSimpleModelServer(context);
-        await startServer(context);
-        await checkMcpHealth(context);
+        await startServer();
+        await checkMcpHealth();
         // Full /health self-test (fault-tracking + self-test checks), not just /mcp
         // reachability — see checkMcpFullHealth's doc comment for why this doesn't restart
         // on its own. Fire-and-forget so a slow/unreachable check doesn't hold up activation.
@@ -596,7 +594,7 @@ async function ensureInstalled(context: vscode.ExtensionContext) {
 }
 
 /** Hits the MCP /mcp endpoint after startup. If unreachable, restarts the MCP server. */
-async function checkMcpHealth(context: vscode.ExtensionContext): Promise<boolean> {
+async function checkMcpHealth(): Promise<boolean> {
     const cfg = vscode.workspace.getConfiguration("tokenSaver");
     const port = actualServerPort ?? cfg.get<number>("server.port", 11436);
     // Use 127.0.0.1 instead of localhost to avoid IPv6 resolution on Windows.
@@ -615,7 +613,7 @@ async function checkMcpHealth(context: vscode.ExtensionContext): Promise<boolean
 
     await stopServer();
     try {
-        await startServer(context);
+        await startServer();
         return true;
     } catch {
         return false;
@@ -699,27 +697,39 @@ export function deactivate() {
 process.on("exit", () => {
     try {
         serverProcess?.kill();
-    } catch {}
+    } catch {
+        // Already exited or never started; nothing to clean up.
+    }
     try {
         simpleModelServerProcess?.kill();
-    } catch {}
+    } catch {
+        // Already exited or never started; nothing to clean up.
+    }
 });
 process.on("SIGTERM", () => {
     try {
         serverProcess?.kill();
-    } catch {}
+    } catch {
+        // Already exited or never started; nothing to clean up.
+    }
     try {
         simpleModelServerProcess?.kill();
-    } catch {}
+    } catch {
+        // Already exited or never started; nothing to clean up.
+    }
     process.exit(0);
 });
 process.on("SIGINT", () => {
     try {
         serverProcess?.kill();
-    } catch {}
+    } catch {
+        // Already exited or never started; nothing to clean up.
+    }
     try {
         simpleModelServerProcess?.kill();
-    } catch {}
+    } catch {
+        // Already exited or never started; nothing to clean up.
+    }
     process.exit(0);
 });
 
@@ -731,7 +741,7 @@ process.on("SIGINT", () => {
  * Windows service runs; the extension no longer bundles a raw copy of this exe, so this is the
  * only path used once the MSI has been installed. Mirrors tokenSaverInstalledExePath() below.
  */
-function simpleModelServerExePath(context: vscode.ExtensionContext): string {
+function simpleModelServerExePath(): string {
     const cfg = vscode.workspace.getConfiguration("tokenSaver");
     const override = cfg.get<string>("simpleModelServer.exePath", "");
     if (override) return override;
@@ -792,7 +802,7 @@ async function startSimpleModelServer(context: vscode.ExtensionContext) {
         "http://localhost:11435/health",
     );
     const timeoutSec = cfg.get<number>("simpleModelServer.startTimeout", 120);
-    const exe = simpleModelServerExePath(context);
+    const exe = simpleModelServerExePath();
 
     // If something is already listening at the health URL, adopt it
     const port = new URL(healthUrl).port;
@@ -1213,7 +1223,7 @@ function tokenSaverMsiPath(context: vscode.ExtensionContext): string {
     );
 }
 
-function mcpExePath(context: vscode.ExtensionContext): string {
+function mcpExePath(): string {
     const cfg = vscode.workspace.getConfiguration("tokenSaver");
     const override = cfg.get<string>("dotnet.projectPath", "");
     if (override) {
@@ -1229,7 +1239,7 @@ function mcpExePath(context: vscode.ExtensionContext): string {
     return tokenSaverInstalledExePath();
 }
 
-async function startServer(context: vscode.ExtensionContext) {
+async function startServer() {
     const cfg = vscode.workspace.getConfiguration("tokenSaver");
     const port = cfg.get<number>("server.port", 11436);
 
@@ -1315,7 +1325,7 @@ async function startServer(context: vscode.ExtensionContext) {
         };
     } else {
         // Installed mode: run the MSI-installed exe directly (Program Files\TokenSaver)
-        spawnArgs = { cmd: mcpExePath(context), args: [] };
+        spawnArgs = { cmd: mcpExePath(), args: [] };
     }
 
     log(`Launching: ${spawnArgs.cmd} ${spawnArgs.args.join(" ")}`);
@@ -1478,7 +1488,7 @@ async function restartServer(context: vscode.ExtensionContext) {
     await stopServer();
     await stopSimpleModelServer();
     await startSimpleModelServer(context);
-    await startServer(context);
+    await startServer();
 }
 
 // ─── Manual install prompt (VS Code Copilot, Claude Code, Cursor, Sixth, Continue) ──────────
@@ -1515,11 +1525,9 @@ function registerMcpProvider(context: vscode.ExtensionContext) {
             typeof vscode.lm?.registerMcpServerDefinitionProvider === "function"
         ) {
             const provider: vscode.McpServerDefinitionProvider = {
-                async provideMcpServerDefinitions(
-                    _token: vscode.CancellationToken,
-                ) {
+                async provideMcpServerDefinitions() {
                     await startSimpleModelServer(context);
-                    await startServer(context);
+                    await startServer();
                     const port =
                         actualServerPort ??
                         vscode.workspace
@@ -1536,10 +1544,9 @@ function registerMcpProvider(context: vscode.ExtensionContext) {
                 },
                 async resolveMcpServerDefinition(
                     server,
-                    _token: vscode.CancellationToken,
                 ) {
                     await startSimpleModelServer(context);
-                    await startServer(context);
+                    await startServer();
                     return server;
                 },
             };
@@ -1810,7 +1817,6 @@ async function installSimpleModelServerService(context: vscode.ExtensionContext)
         return;
     }
 
-    cachedSimpleModelServerExePath = simpleModelServerExePath(context);
     usingSimpleModelServerWindowsService = true;
     log("SimpleModelServer service installed and started.");
     vscode.window.showInformationMessage(
@@ -1956,7 +1962,6 @@ async function installTokenSaverService(context: vscode.ExtensionContext) {
         return;
     }
 
-    cachedTokenSaverExePath = tokenSaverInstalledExePath();
     usingTokenSaverWindowsService = true;
     log("TokenSaverMCP service installed and started.");
     vscode.window.showInformationMessage(

@@ -16,15 +16,20 @@
   "scripts": {
     "build": "tsc",
     "watch": "tsc --watch",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "check": "node scripts/check.mjs",
     "package": "vsce package --out tokensaver.vsix --no-dependencies",
-    "package:vsix": "pwsh -File ..\\..\\.\\build\\scripts\\build-vsix.ps1"
-  },
-  "dependencies": {
+    "package:vsix": "pwsh -File ..\\..\\..\\scripts\\build-vsix.ps1"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^26.0.1",
     "@types/vscode": "^1.125.0",
-    "typescript": "^5.4.0"
+    "eslint": "^10.15.0",
+    "typescript": "^5.4.0",
+    "typescript-eslint": "^8.72.2",
+    "vitest": "^5.1.0"
   },
   "files": [
     "dist/**",
@@ -261,5 +266,3 @@
     }
   }
 }
-
-
