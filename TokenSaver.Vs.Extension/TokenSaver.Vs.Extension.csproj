@@ -68,7 +68,7 @@
   <!-- Override the repo-wide Nerdbank.GitVersioning (3.9.50, injected by Directory.Build.props)
        up to 3.10.91 via Update so there is no duplicate PackageReference. -->
   <ItemGroup>
-    <PackageReference Update="Nerdbank.GitVersioning" Version="3.10.91" />
+    <PackageReference Update="Nerdbank.GitVersioning" Version="3.10.94" />
   </ItemGroup>
 
 </Project>
