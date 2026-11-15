@@ -10,61 +10,53 @@ using TokenSaver.Vs.Extension.WindowsService;
 
 namespace TokenSaver.Vs.Extension.Commands;
 
-/// <summary>Shared install/uninstall flow for the two bundled service installers.</summary>
+/// <summary>Shared install/uninstall flow for the two bundled service installers. Returns a message, shows nothing.</summary>
 internal static class ServiceInstall
 {
     public const string SimpleModelServerServiceName = "SimpleModelServer";
     public const string McpInstallerFile = "TokenSaver-Setup.msi";
     public const string SimpleModelServerInstallerFile = "SimpleModelServer-Setup.msi";
 
-    public static async Task InstallAsync(
-        VisualStudioExtensibility extensibility, string label, string serviceName, string msiFile, CancellationToken ct)
+    public static async Task<(bool ok, string message)> InstallAsync(string label, string serviceName, string msiFile)
     {
         ExtensionLog.Logger.LogInfo($"Install {label} service requested");
         if (await WindowsServiceHelper.IsServiceInstalledAsync(serviceName).ConfigureAwait(false))
         {
-            await ServerControl.ShowAsync(extensibility, $"{label} service is already installed.", ct).ConfigureAwait(false);
-            return;
+            return (true, $"{label} service is already installed.");
         }
 
         var msi = MsiInstaller.BundledMsiPath(msiFile);
         if (!File.Exists(msi))
         {
-            await ServerControl.ShowAsync(extensibility, $"{label} installer is not bundled with this build: {msi}", ct).ConfigureAwait(false);
-            return;
+            return (false, $"{label} installer is not bundled with this build: {msi}");
         }
 
         var code = await MsiInstaller.RunAsync("/i", msi).ConfigureAwait(false);
-        var message = code == 0
-            ? $"{label} service installed. A UAC prompt was shown for elevation."
-            : $"{label} install failed (msiexec exit code {code}). Approve the UAC prompt and try again.";
         ExtensionLog.Logger.LogInfo($"Install {label} service finished with code {code}");
-        await ServerControl.ShowAsync(extensibility, message, ct).ConfigureAwait(false);
+        return code == 0
+            ? (true, $"{label} service installed.")
+            : (false, $"{label} install failed (msiexec exit code {code}). Approve the UAC prompt and try again.");
     }
 
-    public static async Task UninstallAsync(
-        VisualStudioExtensibility extensibility, string label, string serviceName, string msiFile, CancellationToken ct)
+    public static async Task<(bool ok, string message)> UninstallAsync(string label, string serviceName, string msiFile)
     {
         ExtensionLog.Logger.LogInfo($"Uninstall {label} service requested");
         if (!await WindowsServiceHelper.IsServiceInstalledAsync(serviceName).ConfigureAwait(false))
         {
-            await ServerControl.ShowAsync(extensibility, $"{label} service is not installed.", ct).ConfigureAwait(false);
-            return;
+            return (true, $"{label} service is not installed.");
         }
 
         var msi = MsiInstaller.BundledMsiPath(msiFile);
         if (!File.Exists(msi))
         {
-            await ServerControl.ShowAsync(extensibility, $"{label} uninstaller is not bundled with this build: {msi}", ct).ConfigureAwait(false);
-            return;
+            return (false, $"{label} uninstaller is not bundled with this build: {msi}");
         }
 
         var code = await MsiInstaller.RunAsync("/x", msi).ConfigureAwait(false);
-        var message = code == 0
-            ? $"{label} service uninstalled."
-            : $"{label} uninstall failed (msiexec exit code {code}). Approve the UAC prompt and try again.";
         ExtensionLog.Logger.LogInfo($"Uninstall {label} service finished with code {code}");
-        await ServerControl.ShowAsync(extensibility, message, ct).ConfigureAwait(false);
+        return code == 0
+            ? (true, $"{label} service uninstalled.")
+            : (false, $"{label} uninstall failed (msiexec exit code {code}). Approve the UAC prompt and try again.");
     }
 }
 
@@ -74,8 +66,11 @@ public sealed class InstallMcpServiceCommand(VisualStudioExtensibility extensibi
 {
     public override CommandConfiguration CommandConfiguration => new("Install TokenSaver MCP Service");
 
-    public override Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken) =>
-        ServiceInstall.InstallAsync(this.Extensibility, "TokenSaver MCP", ServerControl.ServiceName, ServiceInstall.McpInstallerFile, cancellationToken);
+    public override async Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
+    {
+        var (_, message) = await ServiceInstall.InstallAsync("TokenSaver MCP", ServerControl.ServiceName, ServiceInstall.McpInstallerFile).ConfigureAwait(false);
+        await ServerControl.ShowAsync(this.Extensibility, message, cancellationToken).ConfigureAwait(false);
+    }
 }
 
 /// <summary>Uninstalls the TokenSaver MCP Windows service (TokenSaverMCP) via the bundled MSI.</summary>
@@ -84,8 +79,11 @@ public sealed class UninstallMcpServiceCommand(VisualStudioExtensibility extensi
 {
     public override CommandConfiguration CommandConfiguration => new("Uninstall TokenSaver MCP Service");
 
-    public override Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken) =>
-        ServiceInstall.UninstallAsync(this.Extensibility, "TokenSaver MCP", ServerControl.ServiceName, ServiceInstall.McpInstallerFile, cancellationToken);
+    public override async Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
+    {
+        var (_, message) = await ServiceInstall.UninstallAsync("TokenSaver MCP", ServerControl.ServiceName, ServiceInstall.McpInstallerFile).ConfigureAwait(false);
+        await ServerControl.ShowAsync(this.Extensibility, message, cancellationToken).ConfigureAwait(false);
+    }
 }
 
 /// <summary>Installs the SimpleModelServer Windows service from the bundled MSI.</summary>
@@ -94,8 +92,11 @@ public sealed class InstallSimpleModelServerCommand(VisualStudioExtensibility ex
 {
     public override CommandConfiguration CommandConfiguration => new("Install SimpleModelServer Service");
 
-    public override Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken) =>
-        ServiceInstall.InstallAsync(this.Extensibility, "SimpleModelServer", ServiceInstall.SimpleModelServerServiceName, ServiceInstall.SimpleModelServerInstallerFile, cancellationToken);
+    public override async Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
+    {
+        var (_, message) = await ServiceInstall.InstallAsync("SimpleModelServer", ServiceInstall.SimpleModelServerServiceName, ServiceInstall.SimpleModelServerInstallerFile).ConfigureAwait(false);
+        await ServerControl.ShowAsync(this.Extensibility, message, cancellationToken).ConfigureAwait(false);
+    }
 }
 
 /// <summary>Uninstalls the SimpleModelServer Windows service via the bundled MSI.</summary>
@@ -104,6 +105,9 @@ public sealed class UninstallSimpleModelServerCommand(VisualStudioExtensibility 
 {
     public override CommandConfiguration CommandConfiguration => new("Uninstall SimpleModelServer Service");
 
-    public override Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken) =>
-        ServiceInstall.UninstallAsync(this.Extensibility, "SimpleModelServer", ServiceInstall.SimpleModelServerServiceName, ServiceInstall.SimpleModelServerInstallerFile, cancellationToken);
+    public override async Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
+    {
+        var (_, message) = await ServiceInstall.UninstallAsync("SimpleModelServer", ServiceInstall.SimpleModelServerServiceName, ServiceInstall.SimpleModelServerInstallerFile).ConfigureAwait(false);
+        await ServerControl.ShowAsync(this.Extensibility, message, cancellationToken).ConfigureAwait(false);
+    }
 }
