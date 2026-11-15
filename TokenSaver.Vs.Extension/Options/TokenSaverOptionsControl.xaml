@@ -91,6 +91,35 @@
             <TextBox x:Name="McpBehaviorConfigPathTextBox" Grid.Row="6" Grid.Column="1" Margin="0,2" />
         </Grid>
 
+        <TextBlock Text="MCP advanced" FontWeight="Bold" Margin="0,10,0,4" />
+        <CheckBox x:Name="McpVerboseLoggingCheckBox" Content="Verbose logging (MCP server)" Margin="0,2" />
+        <CheckBox x:Name="McpAutoInterceptCheckBox" Content="Context helper: auto-intercept" Margin="0,2" />
+        <CheckBox x:Name="McpAutoWarmCheckBox" Content="Context helper: auto-warm on startup" Margin="0,2" />
+        <CheckBox x:Name="McpEnableDistillCheckBox" Content="Token economy: distill" Margin="0,2" />
+        <CheckBox x:Name="McpEnableTerseCheckBox" Content="Token economy: terse mode" Margin="0,2" />
+        <CheckBox x:Name="McpEnableSavingsCheckBox" Content="Token economy: savings tracking" Margin="0,2" />
+        <Grid Margin="0,4,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="170" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="Context size limit" VerticalAlignment="Center" />
+            <TextBox x:Name="McpCtxSizeLimitTextBox" Grid.Row="0" Grid.Column="1" Margin="0,2" />
+
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="Endpoint selection" VerticalAlignment="Center" />
+            <ComboBox x:Name="McpEndpointStrategyComboBox" Grid.Row="1" Grid.Column="1" Margin="0,2" />
+
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="Endpoints (name|url|primary|models; one per line)" TextWrapping="Wrap" />
+            <TextBox x:Name="McpEndpointsTextBox" Grid.Row="2" Grid.Column="1" Margin="0,2" Height="80"
+                     AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" />
+        </Grid>
+
         <TextBlock x:Name="StatusTextBlock" Foreground="Gray" Margin="0,10,0,0" TextWrapping="Wrap" />
     </StackPanel>
 </UserControl>

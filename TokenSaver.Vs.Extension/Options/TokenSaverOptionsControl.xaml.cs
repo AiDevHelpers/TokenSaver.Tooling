@@ -77,6 +77,7 @@ public partial class TokenSaverOptionsControl : UserControl
         McpHealthCheckIntervalTextBox.Text = (McpSettingsFile.Get(root, "HealthCheckInterval")?.GetValue<string>() ?? "00:00:30");
         McpWorkspaceRootTextBox.Text = McpSettingsFile.Get(root, "WorkspaceRoot")?.GetValue<string>() ?? "";
         McpBehaviorConfigPathTextBox.Text = McpSettingsFile.Get(root, "BehaviorConfigPath")?.GetValue<string>() ?? "";
+        LoadAdvanced(root);
     }
 
     /// <summary>Writes the MCP section's edited values into <paramref name="root"/>. Returns false with an error on bad input.</summary>
@@ -104,6 +105,11 @@ public partial class TokenSaverOptionsControl : UserControl
         McpSettingsFile.Set(root, "HealthCheckInterval", JsonValue.Create(healthCheck.ToString("c", CultureInfo.InvariantCulture)));
         McpSettingsFile.Set(root, "WorkspaceRoot", JsonValue.Create(McpWorkspaceRootTextBox.Text.Trim()));
         McpSettingsFile.Set(root, "BehaviorConfigPath", JsonValue.Create(McpBehaviorConfigPathTextBox.Text.Trim()));
+        if (!TryApplyAdvanced(root, out error))
+        {
+            return false;
+        }
+
         error = null;
         return true;
     }

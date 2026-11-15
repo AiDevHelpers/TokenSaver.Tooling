@@ -48,6 +48,47 @@ internal static class McpSettingsFile
         section[key] = value;
     }
 
+    /// <summary>Reads a nested key under the section, e.g. "ContextHelper:AutoIntercept". Null when any part is missing.</summary>
+    public static JsonNode? GetPath(JsonObject root, string path)
+    {
+        JsonNode? node = root[SectionName];
+        foreach (var part in path.Split(':'))
+        {
+            node = (node as JsonObject)?[part];
+            if (node is null)
+            {
+                return null;
+            }
+        }
+
+        return node;
+    }
+
+    /// <summary>Writes a nested key under the section, creating intermediate objects as needed.</summary>
+    public static void SetPath(JsonObject root, string path, JsonNode? value)
+    {
+        var parts = path.Split(':');
+        var current = EnsureObject(root, SectionName);
+        for (var i = 0; i < parts.Length - 1; i++)
+        {
+            current = EnsureObject(current, parts[i]);
+        }
+
+        current[parts[^1]] = value;
+    }
+
+    private static JsonObject EnsureObject(JsonObject parent, string key)
+    {
+        if (parent[key] is JsonObject existing)
+        {
+            return existing;
+        }
+
+        var created = new JsonObject();
+        parent[key] = created;
+        return created;
+    }
+
     public static void Save(JsonObject root)
     {
         System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(Path)!);
