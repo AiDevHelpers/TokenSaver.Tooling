@@ -30,6 +30,7 @@ internal static class TokenSaverMenu
             MenuChild.Command<ShowServerStatusCommand>(),
             MenuChild.Command<ShowLogsCommand>(),
             MenuChild.Command<FullSetupCommand>(),
+            MenuChild.Command<InstallPromptCommand>(),
             MenuChild.Command<InstallMcpServiceCommand>(),
             MenuChild.Command<UninstallMcpServiceCommand>(),
             MenuChild.Command<InstallSimpleModelServerCommand>(),

@@ -59,6 +59,10 @@
              Condition="Exists('..\TokenSaver.VsCodeExt\bin\SimpleModelServer.Setup\SimpleModelServer-Setup.msi')"
              CopyToOutputDirectory="PreserveNewest"
              IncludeInVSIX="true" />
+    <Content Include="..\TokenSaver.VsCodeExt\INSTALL_PROMPT.md"
+             Link="INSTALL_PROMPT.md"
+             CopyToOutputDirectory="PreserveNewest"
+             IncludeInVSIX="true" />
   </ItemGroup>
 
   <!-- Override the repo-wide Nerdbank.GitVersioning (3.9.50, injected by Directory.Build.props)
