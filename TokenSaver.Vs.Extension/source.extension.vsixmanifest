@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
-    <Identity Id="TokenSaver.Vs.Extension" Version="0.1.0" Language="en-US" Publisher="TokenSaver" />
+    <Identity Id="TokenSaver.Vs.Extension" Version="$version$" Language="en-US" Publisher="TokenSaver" />
     <DisplayName>TokenSaver</DisplayName>
     <Description xml:space="preserve">AI-native code indexing and context building for Visual Studio 2026. Manages the TokenSaver.MCP server (start/stop the Windows service and check its health) from the Extensions menu.</Description>
     <MoreInfo>https://github.com/rsperry79/TokenSaver</MoreInfo>

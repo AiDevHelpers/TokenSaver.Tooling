@@ -18,13 +18,17 @@ internal sealed class ExtensionEntrypoint : global::Microsoft.VisualStudio.Exten
     /// <inheritdoc/>
     public override ExtensionConfiguration ExtensionConfiguration => new()
     {
-        // In-process (VSSDK-compatible) extensions must have a null Metadata: the manifest is the
-        // static source.extension.vsixmanifest file instead of this source-generated one, because
-        // in-proc hosting needs the classic Microsoft.VisualStudio.VsPackage asset entry (for the
-        // ProvideOptionPageAttribute-based Tools > Options page) that the generated manifest has no
-        // way to express. See source.extension.vsixmanifest for the id/display name/description/
-        // installation-target metadata that used to live here.
-        RequiresInProcessHosting = true,
+        RequiresInProcessHosting = false,
+        Metadata = new(
+            id: "TokenSaver.Vs.Extension",
+            version: new Version(1, 0, 0),
+            publisherName: "TokenSaver",
+            displayName: "TokenSaver",
+            description: "AI-native code indexing and context building for Visual Studio 2026. Manages the TokenSaver.MCP server (start/stop the Windows service and check its health) from the Extensions menu.")
+        {
+            MoreInfo = "https://github.com/rsperry79/TokenSaver",
+            ReleaseNotes = "https://github.com/rsperry79/TokenSaver/releases",
+        },
     };
 
     /// <inheritdoc/>

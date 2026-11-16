@@ -24,7 +24,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWpf>true</UseWpf>
-    <VssdkCompatibleExtension>true</VssdkCompatibleExtension>
+    <VssdkCompatibleExtension>false</VssdkCompatibleExtension>
     <!-- The Output Window extensibility API (Views().Output.CreateOutputChannelAsync, used by the
          SimpleModelServer commands to show responses) is still marked preview by the SDK. -->
     <!-- NU1701: Microsoft.VisualStudio.Sdk (needed for DialogPage/ProvideOptionPageAttribute, see
