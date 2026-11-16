@@ -19,7 +19,7 @@ public sealed class OpenSettingsCommand(
     VisualStudioExtensibility extensibility,
     AsyncServiceProviderInjection<SVsShell, IVsShell> vsShell) : Command(extensibility)
 {
-    public override CommandConfiguration CommandConfiguration => new("Settings...");
+    public override CommandConfiguration CommandConfiguration => new("Settings...") { Placements = [CommandPlacement.KnownPlacements.ExtensionsMenu] };
 
     public override async Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
     {

@@ -17,7 +17,7 @@ namespace TokenSaver.Vs.Extension.Commands;
 [VisualStudioContribution]
 public sealed class OpenChatCommand(VisualStudioExtensibility extensibility) : Command(extensibility)
 {
-    public override CommandConfiguration CommandConfiguration => new("Open Chat");
+    public override CommandConfiguration CommandConfiguration => new("Open Chat") { Placements = [CommandPlacement.KnownPlacements.ExtensionsMenu] };
 
     public override async Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
     {

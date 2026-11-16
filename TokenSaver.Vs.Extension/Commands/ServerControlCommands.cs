@@ -29,7 +29,7 @@ internal static class ServerControl
 [VisualStudioContribution]
 public sealed class StopServerCommand(VisualStudioExtensibility extensibility) : Command(extensibility)
 {
-    public override CommandConfiguration CommandConfiguration => new("%StopServer.DisplayName%");
+    public override CommandConfiguration CommandConfiguration => new("%StopServer.DisplayName%") { Placements = [CommandPlacement.KnownPlacements.ExtensionsMenu] };
 
     public override async Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
     {
@@ -49,7 +49,7 @@ public sealed class StopServerCommand(VisualStudioExtensibility extensibility) :
 [VisualStudioContribution]
 public sealed class RestartServerCommand(VisualStudioExtensibility extensibility) : Command(extensibility)
 {
-    public override CommandConfiguration CommandConfiguration => new("%RestartServer.DisplayName%");
+    public override CommandConfiguration CommandConfiguration => new("%RestartServer.DisplayName%") { Placements = [CommandPlacement.KnownPlacements.ExtensionsMenu] };
 
     public override async Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
     {
@@ -70,7 +70,7 @@ public sealed class RestartServerCommand(VisualStudioExtensibility extensibility
 [VisualStudioContribution]
 public sealed class ShowServerStatusCommand(VisualStudioExtensibility extensibility) : Command(extensibility)
 {
-    public override CommandConfiguration CommandConfiguration => new("%ShowStatus.DisplayName%");
+    public override CommandConfiguration CommandConfiguration => new("%ShowStatus.DisplayName%") { Placements = [CommandPlacement.KnownPlacements.ExtensionsMenu] };
 
     public override async Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
     {
@@ -97,7 +97,7 @@ public sealed class ShowServerStatusCommand(VisualStudioExtensibility extensibil
 [VisualStudioContribution]
 public sealed class ShowLogsCommand(VisualStudioExtensibility extensibility) : Command(extensibility)
 {
-    public override CommandConfiguration CommandConfiguration => new("%ShowLogs.DisplayName%");
+    public override CommandConfiguration CommandConfiguration => new("%ShowLogs.DisplayName%") { Placements = [CommandPlacement.KnownPlacements.ExtensionsMenu] };
 
     public override Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
     {

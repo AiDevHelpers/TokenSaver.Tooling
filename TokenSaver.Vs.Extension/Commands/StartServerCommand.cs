@@ -14,7 +14,7 @@ namespace TokenSaver.Vs.Extension.Commands;
 [VisualStudioContribution]
 public sealed class StartServerCommand(VisualStudioExtensibility extensibility) : Command(extensibility)
 {
-    public override CommandConfiguration CommandConfiguration => new("%StartServer.DisplayName%");
+    public override CommandConfiguration CommandConfiguration => new("%StartServer.DisplayName%") { Placements = [CommandPlacement.KnownPlacements.ExtensionsMenu] };
 
     public override async Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
     {
