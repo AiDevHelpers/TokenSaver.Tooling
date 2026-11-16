@@ -49,6 +49,7 @@
        root (the default locale), which is where VisualStudio.Extensibility reads it. -->
   <ItemGroup>
     <Content Include="string-resources.json"
+             VSIXSubPath=".vsextension"
              CopyToOutputDirectory="PreserveNewest"
              IncludeInVSIX="true" />
   </ItemGroup>
