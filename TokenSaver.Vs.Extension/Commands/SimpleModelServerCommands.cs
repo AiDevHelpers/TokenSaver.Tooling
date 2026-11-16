@@ -13,7 +13,7 @@ public sealed class AskSimpleModelServerCommand(VisualStudioExtensibility extens
 {
     protected override SimpleModelServerAction Action => SimpleModelServerAction.Chat;
 
-    public override CommandConfiguration CommandConfiguration => new("Ask about Selection") { Placements = [CommandPlacement.KnownPlacements.ExtensionsMenu] };
+    public override CommandConfiguration CommandConfiguration => new("Ask about Selection");
 }
 
 [VisualStudioContribution]
@@ -21,7 +21,7 @@ public sealed class ExplainCodeCommand(VisualStudioExtensibility extensibility) 
 {
     protected override SimpleModelServerAction Action => SimpleModelServerAction.Explain;
 
-    public override CommandConfiguration CommandConfiguration => new("Explain Code") { Placements = [CommandPlacement.KnownPlacements.ExtensionsMenu] };
+    public override CommandConfiguration CommandConfiguration => new("Explain Code");
 }
 
 [VisualStudioContribution]
@@ -29,7 +29,7 @@ public sealed class FixIssuesCommand(VisualStudioExtensibility extensibility) : 
 {
     protected override SimpleModelServerAction Action => SimpleModelServerAction.Fix;
 
-    public override CommandConfiguration CommandConfiguration => new("Fix Issues") { Placements = [CommandPlacement.KnownPlacements.ExtensionsMenu] };
+    public override CommandConfiguration CommandConfiguration => new("Fix Issues");
 }
 
 [VisualStudioContribution]
@@ -37,7 +37,7 @@ public sealed class RefactorCodeCommand(VisualStudioExtensibility extensibility)
 {
     protected override SimpleModelServerAction Action => SimpleModelServerAction.Refactor;
 
-    public override CommandConfiguration CommandConfiguration => new("Refactor Code") { Placements = [CommandPlacement.KnownPlacements.ExtensionsMenu] };
+    public override CommandConfiguration CommandConfiguration => new("Refactor Code");
 }
 
 [VisualStudioContribution]
@@ -45,7 +45,7 @@ public sealed class GenerateDocsCommand(VisualStudioExtensibility extensibility)
 {
     protected override SimpleModelServerAction Action => SimpleModelServerAction.GenerateDocs;
 
-    public override CommandConfiguration CommandConfiguration => new("Generate Docs") { Placements = [CommandPlacement.KnownPlacements.ExtensionsMenu] };
+    public override CommandConfiguration CommandConfiguration => new("Generate Docs");
 }
 
 [VisualStudioContribution]
@@ -53,7 +53,7 @@ public sealed class CodeReviewCommand(VisualStudioExtensibility extensibility) :
 {
     protected override SimpleModelServerAction Action => SimpleModelServerAction.CodeReview;
 
-    public override CommandConfiguration CommandConfiguration => new("Code Review") { Placements = [CommandPlacement.KnownPlacements.ExtensionsMenu] };
+    public override CommandConfiguration CommandConfiguration => new("Code Review");
 }
 
 [VisualStudioContribution]
@@ -61,5 +61,5 @@ public sealed class GenerateTestsCommand(VisualStudioExtensibility extensibility
 {
     protected override SimpleModelServerAction Action => SimpleModelServerAction.GenerateTests;
 
-    public override CommandConfiguration CommandConfiguration => new("Generate Unit Tests") { Placements = [CommandPlacement.KnownPlacements.ExtensionsMenu] };
+    public override CommandConfiguration CommandConfiguration => new("Generate Unit Tests");
 }

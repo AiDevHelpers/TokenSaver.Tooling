@@ -64,7 +64,7 @@ internal static class ServiceInstall
 [VisualStudioContribution]
 public sealed class InstallMcpServiceCommand(VisualStudioExtensibility extensibility) : Command(extensibility)
 {
-    public override CommandConfiguration CommandConfiguration => new("%InstallMcpService.DisplayName%") { Placements = [CommandPlacement.KnownPlacements.ExtensionsMenu] };
+    public override CommandConfiguration CommandConfiguration => new("%InstallMcpService.DisplayName%");
 
     public override async Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
     {
@@ -77,7 +77,7 @@ public sealed class InstallMcpServiceCommand(VisualStudioExtensibility extensibi
 [VisualStudioContribution]
 public sealed class UninstallMcpServiceCommand(VisualStudioExtensibility extensibility) : Command(extensibility)
 {
-    public override CommandConfiguration CommandConfiguration => new("%UninstallMcpService.DisplayName%") { Placements = [CommandPlacement.KnownPlacements.ExtensionsMenu] };
+    public override CommandConfiguration CommandConfiguration => new("%UninstallMcpService.DisplayName%");
 
     public override async Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
     {
@@ -90,7 +90,7 @@ public sealed class UninstallMcpServiceCommand(VisualStudioExtensibility extensi
 [VisualStudioContribution]
 public sealed class InstallSimpleModelServerCommand(VisualStudioExtensibility extensibility) : Command(extensibility)
 {
-    public override CommandConfiguration CommandConfiguration => new("%InstallSimpleModelServer.DisplayName%") { Placements = [CommandPlacement.KnownPlacements.ExtensionsMenu] };
+    public override CommandConfiguration CommandConfiguration => new("%InstallSimpleModelServer.DisplayName%");
 
     public override async Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
     {
@@ -103,7 +103,7 @@ public sealed class InstallSimpleModelServerCommand(VisualStudioExtensibility ex
 [VisualStudioContribution]
 public sealed class UninstallSimpleModelServerCommand(VisualStudioExtensibility extensibility) : Command(extensibility)
 {
-    public override CommandConfiguration CommandConfiguration => new("%UninstallSimpleModelServer.DisplayName%") { Placements = [CommandPlacement.KnownPlacements.ExtensionsMenu] };
+    public override CommandConfiguration CommandConfiguration => new("%UninstallSimpleModelServer.DisplayName%");
 
     public override async Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
     {
