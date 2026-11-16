@@ -45,6 +45,14 @@
     <PackageReference Include="MessagePack" Version="2.5.307" />
   </ItemGroup>
 
+  <!-- Localized strings for %Key% placeholders in CommandConfiguration. Deployed at the .vsextension
+       root (the default locale), which is where VisualStudio.Extensibility reads it. -->
+  <ItemGroup>
+    <Content Include="string-resources.json"
+             CopyToOutputDirectory="PreserveNewest"
+             IncludeInVSIX="true" />
+  </ItemGroup>
+
   <!-- Service installers bundled beside the extension (install/uninstall commands run them via msiexec).
        TokenSaver-Setup.msi is built by scripts/build-vsix.ps1 (VS Code extension) into this path. The
        SimpleModelServer MSI comes from its own repo and is copied in the same way when present. Each item is
