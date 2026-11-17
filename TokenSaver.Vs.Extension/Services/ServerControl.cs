@@ -3,6 +3,7 @@ using System.IO;
 using System.ServiceProcess;
 using System.Threading.Tasks;
 
+using TokenSaver.Vs.Extension.Health;
 using TokenSaver.Vs.Extension.Logging;
 using TokenSaver.Vs.Extension.WindowsService;
 
@@ -60,25 +61,6 @@ internal static class ServerControl
         return "TokenSaver MCP server restarted.";
     }
 
-    /// <summary>One-line state of the MCP service, e.g. "Running, server responding", "Stopped" or "Not installed".</summary>
-    public static async Task<string> StatusAsync()
-    {
-        var state = await WindowsServiceHelper.GetStatusAsync(ServiceName).ConfigureAwait(false);
-        if (state is null)
-        {
-            return "Not installed";
-        }
-
-        if (state != ServiceControllerStatus.Running)
-        {
-            return Describe(state.Value);
-        }
-
-        return await IsRespondingAsync().ConfigureAwait(false)
-            ? "Running, server responding"
-            : "Running, server not responding";
-    }
-
     /// <summary>Service state in words, e.g. StartPending as "Starting".</summary>
     public static string Describe(ServiceControllerStatus state) => state switch
     {
@@ -89,9 +71,6 @@ internal static class ServerControl
         _ => state.ToString(),
     };
 
-    public static async Task<bool> IsRespondingAsync(int port = 11436)
-    {
-        using var extension = new TokenSaverExtension(Environment.CurrentDirectory, ExtensionLog.Logger);
-        return await extension.CheckServerHealthAsync(port).ConfigureAwait(false);
-    }
+    /// <summary>True when the MCP server's /health answers healthy. Gives up after a few seconds; never throws.</summary>
+    public static Task<bool> IsRespondingAsync(int port = 11436) => HealthCheckClient.VerifyMcpServerAsync(port);
 }

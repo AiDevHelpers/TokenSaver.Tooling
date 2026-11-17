@@ -116,25 +116,40 @@ internal sealed class ServicesViewModel : NotifyPropertyChangedObject, IDisposab
         }
     }
 
-    private async Task ReadStatusAsync()
+    private Task ReadStatusAsync() => Task.WhenAll(
+        ReadOneAsync(ServerControl.ServiceName, text => McpStatus = text, () => ServerControl.IsRespondingAsync(), "server responding", "server not responding"),
+        ReadOneAsync(ServiceInstall.SimpleModelServerServiceName, text => SimpleModelServerStatus = text, () => FullSetup.IsSimpleModelServerHealthyAsync(CancellationToken.None), "healthy", "not healthy yet"));
+
+    /// <summary>
+    /// Publishes one service's state. The service state is shown first and the health answer is added when it
+    /// arrives, so a slow or failing health check never leaves the line stuck on "Checking...".
+    /// </summary>
+    private static async Task ReadOneAsync(string serviceName, Action<string> publish, Func<Task<bool>> probe, string ok, string bad)
     {
-        McpStatus = await ServerControl.StatusAsync().ConfigureAwait(false);
-
-        var state = await WindowsServiceHelper.GetStatusAsync(ServiceInstall.SimpleModelServerServiceName).ConfigureAwait(false);
-        if (state is null)
+#pragma warning disable CA1031 // A failed read must reach the page as text, not stop the other service's line.
+        try
         {
-            SimpleModelServerStatus = "Not installed";
-            return;
-        }
+            var state = await WindowsServiceHelper.GetStatusAsync(serviceName).ConfigureAwait(false);
+            if (state is null)
+            {
+                publish("Not installed");
+                return;
+            }
 
-        if (state != ServiceControllerStatus.Running)
+            if (state != ServiceControllerStatus.Running)
+            {
+                publish(ServerControl.Describe(state.Value));
+                return;
+            }
+
+            publish("Running");
+            publish(await probe().ConfigureAwait(false) ? $"Running, {ok}" : $"Running, {bad}");
+        }
+        catch (Exception ex)
         {
-            SimpleModelServerStatus = ServerControl.Describe(state.Value);
-            return;
+            ExtensionLog.Logger.LogException(ex);
+            publish($"Could not read the state: {ex.Message}");
         }
-
-        SimpleModelServerStatus = await FullSetup.IsSimpleModelServerHealthyAsync(CancellationToken.None).ConfigureAwait(false)
-            ? "Running, healthy"
-            : "Running, not healthy yet";
+#pragma warning restore CA1031
     }
 }
