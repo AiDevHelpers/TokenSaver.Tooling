@@ -11,10 +11,10 @@ using Microsoft.VisualStudio.Extensibility.UI;
 
 using TokenSaver.Vs.Extension.Configuration;
 
-namespace TokenSaver.Vs.Extension.Settings;
+namespace TokenSaver.Vs.Extension.Pages;
 
 /// <summary>
-/// Data context of the settings tool window (see <see cref="SettingsToolWindow"/>). Edits two stores: the
+/// Data context of the Settings tab of <see cref="TokenSaverToolWindow"/>. Edits two stores: the
 /// extension's own global behavior config (<see cref="BehaviorConfigManager"/>) and the MCP server's settings file
 /// in %ProgramData% (<see cref="McpSettingsFile"/>). The MCP server reads its file at startup, so a restart applies
 /// those changes. Numeric fields are bound as text and validated on save.
@@ -65,7 +65,6 @@ internal sealed class SettingsViewModel : NotifyPropertyChangedObject
             Load();
             return Task.CompletedTask;
         });
-        Load();
     }
 
     [DataMember] public AsyncCommand SaveCommand { get; }
@@ -131,9 +130,23 @@ internal sealed class SettingsViewModel : NotifyPropertyChangedObject
 
     [DataMember] public string Status { get => _status; set => SetProperty(ref _status, value); }
 
-    private void Load()
+    /// <summary>
+    /// Reads both stores into the form. Not called from the constructor: this object is built while Visual Studio
+    /// registers the extension's commands, where a file error would fail every command.
+    /// </summary>
+    public void Load()
     {
-        var settings = BehaviorConfigManager.GetExtensionSettings();
+        ExtensionBehaviorConfig settings;
+        try
+        {
+            settings = BehaviorConfigManager.GetExtensionSettings();
+        }
+        catch (Exception ex) when (ex is JsonException or System.IO.IOException or UnauthorizedAccessException)
+        {
+            Status = $"Could not read the extension settings: {ex.Message}";
+            return;
+        }
+
         Autostart = settings.Autostart ?? true;
         VerboseLogging = settings.VerboseLogging ?? false;
         AutoWorkflow = settings.AutoWorkflow ?? false;
@@ -149,7 +162,8 @@ internal sealed class SettingsViewModel : NotifyPropertyChangedObject
         {
             LoadMcp(McpSettingsFile.Load());
         }
-        catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException)
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException
+            or System.IO.IOException or UnauthorizedAccessException)
         {
             Status = $"Could not read {McpSettingsFile.Path}: {ex.Message}";
         }

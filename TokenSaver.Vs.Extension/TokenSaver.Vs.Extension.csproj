@@ -7,7 +7,7 @@
     false, RequiresInProcessHosting false on ExtensionEntrypoint). The extension process cannot load
     classic VSSDK assemblies (Microsoft.VisualStudio.Shell.15.0), so a command or tool window must not
     take a VSSDK type in its constructor or signature: one such type fails the whole command set.
-    Settings are a Remote UI tool window (Settings/SettingsToolWindow.cs) for that reason. Manifest
+    Settings, services and logs are tabs of a Remote UI tool window (Pages/TokenSaverToolWindow.cs) for that reason. Manifest
     metadata comes from ExtensionEntrypoint's ExtensionConfiguration.
 
     We intentionally do NOT reference the repo's libraries (TokenSaver.Config /
@@ -52,11 +52,11 @@
   </ItemGroup>
 
   <!-- Remote UI XAML is sent to Visual Studio as text, so it is an embedded resource named after its
-       RemoteUserControl type (TokenSaver.Vs.Extension.Settings.SettingsToolWindowContent.xaml), not a
+       RemoteUserControl type (TokenSaver.Vs.Extension.Pages.TokenSaverToolWindowContent.xaml), not a
        compiled WPF page. -->
   <ItemGroup>
-    <Page Remove="Settings\SettingsToolWindowContent.xaml" />
-    <EmbeddedResource Include="Settings\SettingsToolWindowContent.xaml" />
+    <Page Remove="Pages\TokenSaverToolWindowContent.xaml" />
+    <EmbeddedResource Include="Pages\TokenSaverToolWindowContent.xaml" />
   </ItemGroup>
 
   <!-- Service installers bundled beside the extension (install/uninstall commands run them via msiexec).

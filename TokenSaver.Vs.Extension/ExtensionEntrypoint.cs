@@ -35,5 +35,8 @@ internal sealed class ExtensionEntrypoint : global::Microsoft.VisualStudio.Exten
     protected override void InitializeServices(IServiceCollection serviceCollection)
     {
         base.InitializeServices(serviceCollection);
+
+        // Shared by the tool window and the commands that open it on a given tab.
+        serviceCollection.AddSingleton<Pages.TokenSaverWindowViewModel>();
     }
 }

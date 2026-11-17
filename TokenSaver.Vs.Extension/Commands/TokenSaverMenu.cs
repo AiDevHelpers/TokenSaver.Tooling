@@ -7,9 +7,9 @@ using Microsoft.VisualStudio.Extensibility.Commands;
 namespace TokenSaver.Vs.Extension.Commands;
 
 /// <summary>
-/// Top-level "TokenSaver" submenu under Visual Studio's main "Extensions" menu, holding
-/// extension-wide commands (Settings, chat) that aren't specific to a code selection — unlike the
-/// per-selection "SimpleModelServer" submenu on the editor context menu (see <see cref="SimpleModelServerMenu"/>).
+/// Top-level "TokenSaver" submenu under Visual Studio's main "Extensions" menu: chat, plus one entry per tab of
+/// the TokenSaver tool window (Settings, Services, Logs). Service and setup actions are buttons on the Services
+/// tab, not menu entries. The per-selection commands are on the editor context menu (see <see cref="SimpleModelServerMenu"/>).
 /// Parented to IDG_VS_EXTENSIONS (0x6000) — the standard group for third-party entries directly
 /// under the Extensions menu (guidSHLMainMenu, see vsshlids.h).
 /// </summary>
@@ -23,20 +23,10 @@ internal static class TokenSaverMenu
     {
         Children =
         [
-            MenuChild.Command<OpenSettingsCommand>(),
             MenuChild.Command<OpenChatCommand>(),
-            MenuChild.Command<StartServerCommand>(),
-            MenuChild.Command<StopServerCommand>(),
-            MenuChild.Command<RestartServerCommand>(),
-            MenuChild.Command<ShowServerStatusCommand>(),
-            MenuChild.Command<ShowLogsCommand>(),
-            MenuChild.Command<ToggleAutoWorkflowCommand>(),
-            MenuChild.Command<FullSetupCommand>(),
-            MenuChild.Command<InstallPromptCommand>(),
-            MenuChild.Command<InstallMcpServiceCommand>(),
-            MenuChild.Command<UninstallMcpServiceCommand>(),
-            MenuChild.Command<InstallSimpleModelServerCommand>(),
-            MenuChild.Command<UninstallSimpleModelServerCommand>(),
+            MenuChild.Command<OpenSettingsCommand>(),
+            MenuChild.Command<OpenServicesCommand>(),
+            MenuChild.Command<OpenLogsCommand>(),
         ],
         Placements = [CommandPlacement.VsctParent(ShellMainMenuGuid, ExtensionsMenuGroupId, priority: 0x0100)],
     };

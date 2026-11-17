@@ -3,22 +3,18 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 
-using Microsoft.VisualStudio.Extensibility;
-using Microsoft.VisualStudio.Extensibility.Commands;
-
 using TokenSaver.Vs.Extension.Configuration;
 using TokenSaver.Vs.Extension.Logging;
 using TokenSaver.Vs.Extension.WindowsService;
 
-namespace TokenSaver.Vs.Extension.Commands;
+namespace TokenSaver.Vs.Extension.Services;
 
 /// <summary>
 /// One-shot setup: installs SimpleModelServer, waits for it to report healthy (first run can take minutes while
 /// models warm up; restarts it once a third of the way in), installs TokenSaver MCP, then waits for it to respond.
 /// Each step checks actual state, so re-running skips what is already done. Mirrors the VS Code runFullSetup.
 /// </summary>
-[VisualStudioContribution]
-public sealed class FullSetupCommand(VisualStudioExtensibility extensibility) : Command(extensibility)
+internal static class FullSetup
 {
     private const string FallbackHealthUrl = "http://localhost:11435/health";
     private const int McpPort = 11436;
@@ -26,24 +22,24 @@ public sealed class FullSetupCommand(VisualStudioExtensibility extensibility) : 
     private static readonly TimeSpan McpTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(2);
 
-    public override CommandConfiguration CommandConfiguration => new("%FullSetup.DisplayName%");
-
-    public override async Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
+    /// <summary>Runs the setup. <paramref name="progress"/> gets the step in hand; the result is the final message.</summary>
+    public static async Task<string> RunAsync(Action<string> progress, CancellationToken cancellationToken)
     {
         ExtensionLog.Logger.LogInfo("Full setup requested");
 
         // Step 1: SimpleModelServer service.
+        progress("Full setup: installing SimpleModelServer...");
         if (!await WindowsServiceHelper.IsServiceInstalledAsync(ServiceInstall.SimpleModelServerServiceName).ConfigureAwait(false))
         {
-            var (_, message) = await ServiceInstall.InstallAsync("SimpleModelServer", ServiceInstall.SimpleModelServerServiceName, ServiceInstall.SimpleModelServerInstallerFile).ConfigureAwait(false);
+            var (_, message) = await ServiceInstall.InstallAsync(ServiceInstall.SimpleModelServerLabel, ServiceInstall.SimpleModelServerServiceName, ServiceInstall.SimpleModelServerInstallerFile).ConfigureAwait(false);
             if (!await WindowsServiceHelper.IsServiceInstalledAsync(ServiceInstall.SimpleModelServerServiceName).ConfigureAwait(false))
             {
-                await FailAsync($"TokenSaver setup failed: {message}", cancellationToken).ConfigureAwait(false);
-                return;
+                return Fail(message);
             }
         }
 
         // Step 2: wait for SimpleModelServer to be healthy, not just installed. Restart it once after a third of the wait.
+        progress($"Full setup: waiting for SimpleModelServer to become healthy (up to {SimpleModelServerTimeout.TotalMinutes:0} minutes)...");
         var healthUrl = SimpleModelServerHealthUrl();
         var firstWait = TimeSpan.FromTicks(SimpleModelServerTimeout.Ticks / 3);
         var healthy = await WaitForHealthyAsync(healthUrl, firstWait, cancellationToken).ConfigureAwait(false);
@@ -57,41 +53,44 @@ public sealed class FullSetupCommand(VisualStudioExtensibility extensibility) : 
 
         if (!healthy)
         {
-            await FailAsync($"TokenSaver setup failed: SimpleModelServer did not become healthy within {SimpleModelServerTimeout.TotalMinutes:0} minutes.", cancellationToken).ConfigureAwait(false);
-            return;
+            return Fail($"SimpleModelServer did not become healthy within {SimpleModelServerTimeout.TotalMinutes:0} minutes.");
         }
 
         // Step 3: TokenSaver MCP service.
+        progress("Full setup: installing TokenSaver MCP...");
         if (!await WindowsServiceHelper.IsServiceInstalledAsync(ServerControl.ServiceName).ConfigureAwait(false))
         {
-            var (_, message) = await ServiceInstall.InstallAsync("TokenSaver MCP", ServerControl.ServiceName, ServiceInstall.McpInstallerFile).ConfigureAwait(false);
+            var (_, message) = await ServiceInstall.InstallAsync(ServiceInstall.McpLabel, ServerControl.ServiceName, ServiceInstall.McpInstallerFile).ConfigureAwait(false);
             if (!await WindowsServiceHelper.IsServiceInstalledAsync(ServerControl.ServiceName).ConfigureAwait(false))
             {
-                await FailAsync($"TokenSaver setup failed: {message}", cancellationToken).ConfigureAwait(false);
-                return;
+                return Fail(message);
             }
         }
 
         // Step 4: wait for the MCP server to respond.
+        progress("Full setup: waiting for TokenSaver MCP to respond...");
         if (!await WaitForMcpAsync(cancellationToken).ConfigureAwait(false))
         {
-            await FailAsync($"TokenSaver setup failed: TokenSaver MCP did not respond on port {McpPort} within {McpTimeout.TotalSeconds:0} seconds.", cancellationToken).ConfigureAwait(false);
-            return;
+            return Fail($"TokenSaver MCP did not respond on port {McpPort} within {McpTimeout.TotalSeconds:0} seconds.");
         }
 
         // Step 5: open the install prompt now that both services are confirmed up.
-        var promptError = InstallPromptCommand.Open();
+        var promptError = InstallPrompt.Open();
         ExtensionLog.Logger.LogInfo("Full setup complete");
-        var doneMessage = promptError is null
+        return promptError is null
             ? "TokenSaver setup complete: SimpleModelServer and TokenSaver MCP are installed and running."
             : $"TokenSaver setup complete, but the install prompt did not open: {promptError}";
-        await ServerControl.ShowAsync(this.Extensibility, doneMessage, cancellationToken).ConfigureAwait(false);
     }
 
-    private Task FailAsync(string message, CancellationToken ct)
+    /// <summary>True when the SimpleModelServer health URL from the settings answers with a success status.</summary>
+    public static Task<bool> IsSimpleModelServerHealthyAsync(CancellationToken cancellationToken) =>
+        IsOkAsync(SimpleModelServerHealthUrl(), cancellationToken);
+
+    private static string Fail(string reason)
     {
+        var message = $"TokenSaver setup failed: {reason}";
         ExtensionLog.Logger.LogInfo(message);
-        return ServerControl.ShowAsync(this.Extensibility, message, ct);
+        return message;
     }
 
     private static string SimpleModelServerHealthUrl()
@@ -119,10 +118,9 @@ public sealed class FullSetupCommand(VisualStudioExtensibility extensibility) : 
     private static async Task<bool> WaitForMcpAsync(CancellationToken ct)
     {
         var deadline = DateTime.UtcNow + McpTimeout;
-        using var extension = new TokenSaverExtension(Environment.CurrentDirectory, ExtensionLog.Logger);
         while (DateTime.UtcNow < deadline)
         {
-            if (await extension.CheckServerHealthAsync(McpPort).ConfigureAwait(false))
+            if (await ServerControl.IsRespondingAsync(McpPort).ConfigureAwait(false))
             {
                 return true;
             }

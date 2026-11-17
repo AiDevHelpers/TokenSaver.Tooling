@@ -6,23 +6,26 @@ using Microsoft.VisualStudio.Extensibility;
 using Microsoft.VisualStudio.Extensibility.ToolWindows;
 using Microsoft.VisualStudio.RpcContracts.RemoteUI;
 
-namespace TokenSaver.Vs.Extension.Settings;
+namespace TokenSaver.Vs.Extension.Pages;
 
 /// <summary>
-/// TokenSaver settings tool window, opened by <see cref="Commands.OpenSettingsCommand"/>. The extension runs out of
-/// process, so the form is Remote UI: the XAML in SettingsToolWindowContent.xaml renders inside Visual Studio and
-/// binds to <see cref="SettingsViewModel"/> in the extension process.
+/// The TokenSaver tool window, with Settings, Services and Logs tabs. Opened by the Settings, Services and Logs
+/// commands (see <see cref="Commands.OpenPageCommands"/>). The extension runs out of process, so the window is
+/// Remote UI: the XAML in TokenSaverToolWindowContent.xaml renders inside Visual Studio and binds to
+/// <see cref="TokenSaverWindowViewModel"/> in the extension process.
 /// </summary>
 [VisualStudioContribution]
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes", Justification = "Instantiated by the Visual Studio extension host via reflection.")]
-internal sealed class SettingsToolWindow : ToolWindow
+internal sealed class TokenSaverToolWindow : ToolWindow
 {
-    private SettingsToolWindowContent? _content;
+    private readonly TokenSaverWindowViewModel _viewModel;
+    private TokenSaverToolWindowContent? _content;
 
-    public SettingsToolWindow(VisualStudioExtensibility extensibility)
+    public TokenSaverToolWindow(VisualStudioExtensibility extensibility, TokenSaverWindowViewModel viewModel)
         : base(extensibility)
     {
-        Title = "TokenSaver Settings";
+        _viewModel = viewModel;
+        Title = "TokenSaver";
     }
 
     /// <inheritdoc/>
@@ -34,8 +37,9 @@ internal sealed class SettingsToolWindow : ToolWindow
     /// <inheritdoc/>
     public override Task<IRemoteUserControl> GetContentAsync(CancellationToken cancellationToken)
     {
-        // Built here, not in the constructor, so the settings files are read when the window opens.
-        _content ??= new SettingsToolWindowContent(new SettingsViewModel());
+        // Visual Studio can also restore the window at startup, without a command having prepared the pages.
+        _viewModel.Prepare();
+        _content ??= new TokenSaverToolWindowContent(_viewModel);
         return Task.FromResult<IRemoteUserControl>(_content);
     }
 
