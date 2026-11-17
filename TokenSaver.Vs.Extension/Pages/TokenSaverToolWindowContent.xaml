@@ -396,6 +396,13 @@
                         <Button Content="Uninstall" Command="{Binding UninstallSimpleModelServerCommand}" />
                     </StackPanel>
 
+                    <TextBlock Text="IDE bridge" FontWeight="Bold" Margin="0,18,0,4" />
+                    <TextBlock Text="{Binding BridgeStatus}" Margin="0,0,0,6" />
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="Start" Command="{Binding StartBridgeCommand}" />
+                        <Button Content="Stop" Command="{Binding StopBridgeCommand}" />
+                    </StackPanel>
+
                     <TextBlock Text="Setup" FontWeight="Bold" Margin="0,18,0,4" />
                     <TextBlock Text="Full setup installs both services, waits until they respond, then opens the install prompt."
                                TextWrapping="Wrap" Margin="0,0,0,6" />
