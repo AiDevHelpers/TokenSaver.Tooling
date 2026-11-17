@@ -46,6 +46,7 @@ internal sealed class SettingsViewModel : NotifyPropertyChangedObject
     private bool _buildContextAtStartup;
     private bool _registerWithClients;
     private bool _autoWorkflow;
+    private bool _showLogsOnQuery;
     private string _testRunner = TestExplorer;
 
     // Limits and endpoints
@@ -242,6 +243,8 @@ internal sealed class SettingsViewModel : NotifyPropertyChangedObject
 
     [DataMember] public bool AutoWorkflow { get => _autoWorkflow; set => Set(ref _autoWorkflow, value); }
 
+    [DataMember] public bool ShowLogsOnQuery { get => _showLogsOnQuery; set => Set(ref _showLogsOnQuery, value); }
+
     [DataMember] public string TestRunner { get => _testRunner; set => Set(ref _testRunner, value); }
 
     // ── Limits and endpoints ──
@@ -355,6 +358,7 @@ internal sealed class SettingsViewModel : NotifyPropertyChangedObject
         BuildContextAtStartup = Flag(McpSettingsFile.GetPath(root, "ContextHelper:AutoWarmOnStartup"), true);
         RegisterWithClients = Flag(McpSettingsFile.Get(root, "AutoRegisterProviders"), true);
         AutoWorkflow = Flag(McpSettingsFile.GetPath(root, "CodeHelper:AutoEnabled"), false);
+        ShowLogsOnQuery = Flag(McpSettingsFile.GetPath(root, "LogViewer:AutoOpenOnQuery"), false);
         TestRunner = Str(root, "IdeTestRunMode", "TestExplorer") == "DotnetTest" ? DotnetTest : TestExplorer;
 
         // The server has two context limits (the pipeline's and the cleaner's) and both default to 120,000. One
@@ -470,6 +474,7 @@ internal sealed class SettingsViewModel : NotifyPropertyChangedObject
         McpSettingsFile.SetPath(root, "ContextHelper:AutoWarmOnStartup", JsonValue.Create(BuildContextAtStartup));
         McpSettingsFile.Set(root, "AutoRegisterProviders", JsonValue.Create(RegisterWithClients));
         McpSettingsFile.SetPath(root, "CodeHelper:AutoEnabled", JsonValue.Create(AutoWorkflow));
+        McpSettingsFile.SetPath(root, "LogViewer:AutoOpenOnQuery", JsonValue.Create(ShowLogsOnQuery));
         McpSettingsFile.Set(root, "IdeTestRunMode", JsonValue.Create(TestRunner == DotnetTest ? "DotnetTest" : "TestExplorer"));
 
         McpSettingsFile.Set(root, "ContextSizeLimit", JsonValue.Create(contextLimit));
