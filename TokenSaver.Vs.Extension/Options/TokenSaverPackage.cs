@@ -26,7 +26,6 @@ namespace TokenSaver.Vs.Extension.Options;
 /// </summary>
 [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
 [Guid(PackageGuidString)]
-[ProvideOptionPage(typeof(TokenSaverOptionsPage), "TokenSaver", "General", 0, 0, supportsAutomation: true)]
 public sealed class TokenSaverPackage : AsyncPackage, IDisposable
 {
     public const string PackageGuidString = "34c83c12-40e0-4c22-bf7e-f6f2f2a16636";

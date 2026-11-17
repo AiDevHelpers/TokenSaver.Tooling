@@ -3,17 +3,14 @@
   <!--
     TokenSaver Visual Studio 2026 extension.
 
-    Built on the VisualStudio.Extensibility model, but hosted IN-PROCESS (VssdkCompatibleExtension,
-    RequiresInProcessHosting on ExtensionEntrypoint) rather than out-of-process. That switch was
-    needed to get a real Tools > Options page (ProvideOptionPageAttribute/DialogPage only exist in
-    the classic VSSDK, which in-proc hosting gives access to — see Options/TokenSaverOptionsPage.cs).
-    Manifest metadata now lives in source.extension.vsixmanifest (a static file) instead of
-    ExtensionEntrypoint's generated Metadata, because in-proc extensions require the classic
-    Microsoft.VisualStudio.VsPackage asset entry that the generated manifest can't express.
+    Built on the VisualStudio.Extensibility model and hosted OUT-OF-PROCESS (VssdkCompatibleExtension
+    false, RequiresInProcessHosting false on ExtensionEntrypoint). The extension process cannot load
+    classic VSSDK assemblies (Microsoft.VisualStudio.Shell.15.0), so a command or tool window must not
+    take a VSSDK type in its constructor or signature: one such type fails the whole command set.
+    Settings are a Remote UI tool window (Settings/SettingsToolWindow.cs) for that reason. Manifest
+    metadata comes from ExtensionEntrypoint's ExtensionConfiguration.
 
-    Target framework is still net8.0-windows — VS 2026 hosts in-proc VSSDK-compatible extensions on
-    .NET 8 same as out-of-process ones (unlike VS 2022, which required net472 for in-proc). We
-    intentionally do NOT reference the repo's net10 libraries (TokenSaver.Config /
+    We intentionally do NOT reference the repo's libraries (TokenSaver.Config /
     TokenSaver.Client.Helpers) here — the extension is a thin client that talks to the already-running
     TokenSaver.MCP server over HTTP and controls the Windows service, which keeps the VSIX small and
     the extension reliable.
@@ -52,6 +49,14 @@
              VSIXSubPath=".vsextension"
              CopyToOutputDirectory="PreserveNewest"
              IncludeInVSIX="true" />
+  </ItemGroup>
+
+  <!-- Remote UI XAML is sent to Visual Studio as text, so it is an embedded resource named after its
+       RemoteUserControl type (TokenSaver.Vs.Extension.Settings.SettingsToolWindowContent.xaml), not a
+       compiled WPF page. -->
+  <ItemGroup>
+    <Page Remove="Settings\SettingsToolWindowContent.xaml" />
+    <EmbeddedResource Include="Settings\SettingsToolWindowContent.xaml" />
   </ItemGroup>
 
   <!-- Service installers bundled beside the extension (install/uninstall commands run them via msiexec).
