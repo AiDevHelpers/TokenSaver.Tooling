@@ -1,6 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.Extensibility;
 
+using TokenSaver.Vs.Extension.Services;
+
 namespace TokenSaver.Vs.Extension;
 
 /// <summary>
@@ -30,6 +32,14 @@ internal sealed class ExtensionEntrypoint : global::Microsoft.VisualStudio.Exten
             ReleaseNotes = "https://github.com/rsperry79/TokenSaver/releases",
         },
     };
+
+    /// <inheritdoc/>
+    protected override Task OnInitializedAsync(VisualStudioExtensibility extensibility, CancellationToken cancellationToken)
+    {
+        // The extension loads on first use. Start the services in the background so loading is not held up.
+        _ = Task.Run(AutoStart.RunOnceAsync, CancellationToken.None);
+        return Task.CompletedTask;
+    }
 
     /// <inheritdoc/>
     protected override void InitializeServices(IServiceCollection serviceCollection)

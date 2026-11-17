@@ -14,6 +14,29 @@
             </Style>
             <Style TargetType="CheckBox" BasedOn="{StaticResource {x:Static styles:VsResourceKeys.CheckBoxStyleKey}}" />
             <Style TargetType="ComboBox" BasedOn="{StaticResource {x:Static styles:VsResourceKeys.ComboBoxStyleKey}}" />
+            <Style x:Key="SectionHeader" TargetType="TextBlock">
+                <Setter Property="FontWeight" Value="Bold" />
+                <Setter Property="FontSize" Value="15" />
+                <Setter Property="Margin" Value="0,22,0,4" />
+            </Style>
+            <Style x:Key="Label" TargetType="TextBlock">
+                <Setter Property="Margin" Value="0,10,0,3" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+            </Style>
+            <Style x:Key="Help" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource {x:Static styles:VsBrushes.GrayTextKey}}" />
+                <Setter Property="FontSize" Value="11" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+                <Setter Property="Margin" Value="0,3,0,0" />
+            </Style>
+            <Style x:Key="CheckHelp" TargetType="TextBlock" BasedOn="{StaticResource Help}">
+                <Setter Property="Margin" Value="22,1,0,0" />
+            </Style>
+            <Style x:Key="Err" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="#F14C4C" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+                <Setter Property="Margin" Value="0,3,0,0" />
+            </Style>
             <!-- The stock tab header is drawn in system colours; this one follows the Visual Studio theme. -->
             <Style TargetType="TabItem">
                 <Setter Property="Foreground" Value="{DynamicResource {x:Static styles:VsBrushes.WindowTextKey}}" />
@@ -37,134 +60,150 @@
         </TabControl.Resources>
 
         <TabItem Header="Settings">
-            <ScrollViewer DataContext="{Binding Settings}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
-                <StackPanel Margin="4,12,4,4" Width="520" HorizontalAlignment="Left">
-                    <TextBlock Text="Server" FontWeight="Bold" Margin="0,0,0,4" />
-                    <CheckBox IsChecked="{Binding Autostart}" Content="Automatically start the TokenSaver MCP server" Margin="0,2" />
-                    <CheckBox IsChecked="{Binding VerboseLogging}" Content="Verbose logging" Margin="0,2" />
-                    <CheckBox IsChecked="{Binding AutoWorkflow}" Content="Auto-workflow (Visual Studio only; does not change the server)" Margin="0,2" />
+            <Grid DataContext="{Binding Settings}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
-                    <Grid Margin="0,4">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="170" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
+                <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="4,12,12,12" MaxWidth="620" HorizontalAlignment="Left">
+                        <TextBlock Style="{StaticResource Help}" Margin="0"
+                                   Text="TokenSaver MCP server settings are saved to %ProgramData%\TokenSaver\appsettings.json and apply after the server restarts. Visual Studio extension settings apply straight away." />
 
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Server port" VerticalAlignment="Center" />
-                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Port}" Margin="0,2" />
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="Connection" />
+                        <TextBlock Style="{StaticResource Label}" Text="Model server URL" />
+                        <TextBox Text="{Binding ModelServerUrl}" />
+                        <TextBlock Style="{StaticResource Help}" Text="The SimpleModelServer router that TokenSaver MCP calls for summaries. Default: http://localhost:11435" />
+                        <TextBlock Style="{StaticResource Err}" Text="{Binding ModelServerUrlError}" />
 
-                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Start timeout (s)" VerticalAlignment="Center" />
-                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding StartTimeout}" Margin="0,2" />
+                        <TextBlock Style="{StaticResource Label}" Text="Helper model" />
+                        <TextBox Text="{Binding HelperModel}" />
+                        <TextBlock Style="{StaticResource Help}" Text="Name of the model used for summaries. Default: HelperModel" />
 
-                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Idle timeout (s)" VerticalAlignment="Center" />
-                        <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding IdleTimeout}" Margin="0,2" />
-                    </Grid>
+                        <TextBlock Style="{StaticResource Label}" Text="MCP server port" />
+                        <TextBox Text="{Binding McpPort}" MaxWidth="120" HorizontalAlignment="Left" />
+                        <TextBlock Style="{StaticResource Help}" Text="The port TokenSaver MCP listens on. The extension uses it for health checks. Default: 11436" />
+                        <TextBlock Style="{StaticResource Err}" Text="{Binding McpPortError}" />
 
-                    <TextBlock Text="SimpleModelServer" FontWeight="Bold" Margin="0,12,0,4" />
-                    <Grid Margin="0,4">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="170" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="Features" />
+                        <CheckBox IsChecked="{Binding SummarizeOutput}" Content="Summarize tool output" />
+                        <TextBlock Style="{StaticResource CheckHelp}" Text="Off: tools return raw, size-capped text." />
+                        <CheckBox IsChecked="{Binding AllowTerse}" Content="Allow terse mode" Margin="0,8,0,0" />
+                        <TextBlock Style="{StaticResource CheckHelp}" Text="Off: requests for terse answers are ignored." />
+                        <CheckBox IsChecked="{Binding TrackSavings}" Content="Track token savings" Margin="0,8,0,0" />
+                        <TextBlock Style="{StaticResource CheckHelp}" Text="Needed for the token savings reports." />
+                        <CheckBox IsChecked="{Binding CleanPrompts}" Content="Clean prompts automatically" Margin="0,8,0,0" />
+                        <TextBlock Style="{StaticResource CheckHelp}" Text="Removes duplicates and log noise from every tool call." />
+                        <CheckBox IsChecked="{Binding BuildContextAtStartup}" Content="Build context at startup" Margin="0,8,0,0" />
+                        <TextBlock Style="{StaticResource CheckHelp}" Text="Off: context is built only when requested." />
+                        <CheckBox IsChecked="{Binding RegisterWithClients}" Content="Register with AI clients" Margin="0,8,0,0" />
+                        <TextBlock Style="{StaticResource CheckHelp}" Text="Adds the server to the configuration of supported AI clients." />
+                        <CheckBox IsChecked="{Binding AutoWorkflow}" Content="Auto-workflow" Margin="0,8,0,0" />
+                        <TextBlock Style="{StaticResource CheckHelp}" Text="Lets the server run its automatic code workflow (the auto code helper)." />
 
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Loader.exe path" VerticalAlignment="Center" />
-                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SimpleModelServerExePath}" Margin="0,2" />
+                        <TextBlock Style="{StaticResource Label}" Text="Run tests with" />
+                        <ComboBox ItemsSource="{Binding TestRunners}" SelectedItem="{Binding TestRunner}" MaxWidth="240" HorizontalAlignment="Left" />
+                        <TextBlock Style="{StaticResource Help}" Text="Test Explorer, or dotnet test with TRX results." />
 
-                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Health URL" VerticalAlignment="Center" />
-                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding SimpleModelServerHealthUrl}" Margin="0,2" />
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="Limits" />
+                        <TextBlock Style="{StaticResource Label}" Text="Context limit (tokens)" />
+                        <TextBox Text="{Binding ContextLimit}" MaxWidth="160" HorizontalAlignment="Left" />
+                        <TextBlock Style="{StaticResource Help}" Text="Budget for the context TokenSaver builds. Default: 120000" />
+                        <TextBlock Style="{StaticResource Err}" Text="{Binding ContextLimitError}" />
 
-                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Start timeout (s)" VerticalAlignment="Center" />
-                        <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SimpleModelServerStartTimeout}" Margin="0,2" />
-                    </Grid>
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="Extra model endpoints" />
+                        <TextBlock Style="{StaticResource Help}" Margin="0,0,0,4"
+                                   Text="Optional. With none listed, the model server URL above is used." />
+                        <TextBlock Style="{StaticResource Label}" Text="Endpoint selection" />
+                        <ComboBox ItemsSource="{Binding EndpointStrategies}" SelectedItem="{Binding EndpointStrategy}" MaxWidth="240" HorizontalAlignment="Left" />
+                        <TextBlock Style="{StaticResource Help}" Text="Failover: use the primary, then the others if it is down. RoundRobin: rotate. Explicit: only the one a request names." />
 
-                    <TextBlock Text="MCP server (saved to ProgramData)" FontWeight="Bold" Margin="0,12,0,4" />
-                    <CheckBox IsChecked="{Binding McpAutoRegisterProviders}" Content="Auto-register providers" Margin="0,2" />
-                    <CheckBox IsChecked="{Binding IdeTestRunDotnet}" Content="IDE test runs use dotnet test with TRX (off = Test Explorer)" Margin="0,2" />
-                    <Grid Margin="0,4">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="170" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
+                        <ItemsControl ItemsSource="{Binding Endpoints}" Margin="0,8,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderThickness="1" Padding="10,2,10,10" Margin="0,4"
+                                            BorderBrush="{DynamicResource {x:Static styles:VsBrushes.ToolWindowBorderKey}}">
+                                        <StackPanel>
+                                            <TextBlock Style="{StaticResource Label}" Text="Name" />
+                                            <TextBox Text="{Binding Name}" />
+                                            <TextBlock Style="{StaticResource Label}" Text="URL" />
+                                            <TextBox Text="{Binding Url}" />
+                                            <TextBlock Style="{StaticResource Label}" Text="Models (separated by commas)" />
+                                            <TextBox Text="{Binding Models}" />
+                                            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                                <CheckBox IsChecked="{Binding IsPrimary}" Content="Primary endpoint" VerticalAlignment="Center" Margin="0,0,16,0" />
+                                                <Button Content="Remove" Command="{Binding RemoveCommand}" />
+                                            </StackPanel>
+                                            <TextBlock Style="{StaticResource Err}" Text="{Binding Error}" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Button Content="Add endpoint" Command="{Binding AddEndpointCommand}" Margin="0,8,0,0" HorizontalAlignment="Left" />
+                        <TextBlock Style="{StaticResource Err}" Text="{Binding EndpointsError}" />
 
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Ollama URL" VerticalAlignment="Center" />
-                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding McpOllamaUrl}" Margin="0,2" />
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="Visual Studio extension" />
+                        <CheckBox IsChecked="{Binding Autostart}" Content="Start the services when the extension loads" />
+                        <TextBlock Style="{StaticResource CheckHelp}" Text="Starts SimpleModelServer, then TokenSaver MCP, the first time you use TokenSaver in a Visual Studio session." />
+                        <CheckBox IsChecked="{Binding ExtensionDebugLogging}" Content="Extension debug logging" Margin="0,8,0,0" />
+                        <TextBlock Style="{StaticResource CheckHelp}" Text="Writes extra detail to the extension's log. Applies the next time the extension loads." />
 
-                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Ollama model" VerticalAlignment="Center" />
-                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding McpOllamaModel}" Margin="0,2" />
+                        <TextBlock Style="{StaticResource Label}" Text="TokenSaver MCP start timeout (seconds)" />
+                        <TextBox Text="{Binding McpStartTimeout}" MaxWidth="120" HorizontalAlignment="Left" />
+                        <TextBlock Style="{StaticResource Help}" Text="How long to wait for the service to start. Default: 30" />
+                        <TextBlock Style="{StaticResource Err}" Text="{Binding McpStartTimeoutError}" />
 
-                        <TextBlock Grid.Row="2" Grid.Column="0" Text="MCP server port" VerticalAlignment="Center" />
-                        <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding McpServerPort}" Margin="0,2" />
+                        <TextBlock Style="{StaticResource Label}" Text="SimpleModelServer start timeout (seconds)" />
+                        <TextBox Text="{Binding SimpleModelServerStartTimeout}" MaxWidth="120" HorizontalAlignment="Left" />
+                        <TextBlock Style="{StaticResource Help}" Text="The first start can take minutes while models load. Default: 600" />
+                        <TextBlock Style="{StaticResource Err}" Text="{Binding SimpleModelServerStartTimeoutError}" />
 
-                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Context size limit" VerticalAlignment="Center" />
-                        <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding McpContextSizeLimit}" Margin="0,2" />
+                        <TextBlock Style="{StaticResource Label}" Text="SimpleModelServer health URL" />
+                        <TextBox Text="{Binding SimpleModelServerHealthUrl}" />
+                        <TextBlock Style="{StaticResource Help}" Text="Checked to tell when SimpleModelServer is ready. Default: http://localhost:11435/health" />
+                        <TextBlock Style="{StaticResource Err}" Text="{Binding SimpleModelServerHealthUrlError}" />
 
-                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Health check (hh:mm:ss)" VerticalAlignment="Center" />
-                        <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding McpHealthCheckInterval}" Margin="0,2" />
+                        <TextBlock Style="{StaticResource Label}" Text="SimpleModelServer program path" />
+                        <TextBox Text="{Binding SimpleModelServerExePath}" />
+                        <TextBlock Style="{StaticResource Help}" Text="Used by Start when the service is not installed. Blank: C:\Program Files\SimpleModelServer\SimpleModelServer.Server.exe" />
 
-                        <TextBlock Grid.Row="5" Grid.Column="0" Text="Workspace root" VerticalAlignment="Center" />
-                        <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding McpWorkspaceRoot}" Margin="0,2" />
+                        <Expander Margin="0,18,0,0">
+                            <Expander.Header>
+                                <TextBlock Style="{StaticResource SectionHeader}" Margin="0" Text="Advanced" />
+                            </Expander.Header>
+                            <StackPanel Margin="0,0,0,0">
+                                <TextBlock Style="{StaticResource Label}" Text="Health check every (seconds)" />
+                                <TextBox Text="{Binding HealthCheckSeconds}" MaxWidth="120" HorizontalAlignment="Left" />
+                                <TextBlock Style="{StaticResource Help}" Text="How often the server checks its endpoints. Default: 30" />
+                                <TextBlock Style="{StaticResource Err}" Text="{Binding HealthCheckError}" />
 
-                        <TextBlock Grid.Row="6" Grid.Column="0" Text="Behavior config path" VerticalAlignment="Center" />
-                        <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding McpBehaviorConfigPath}" Margin="0,2" />
-                    </Grid>
+                                <TextBlock Style="{StaticResource Label}" Text="Workspace root" />
+                                <TextBox Text="{Binding WorkspaceRoot}" />
+                                <TextBlock Style="{StaticResource Help}" Text="Blank: found automatically from the nearest .git folder or solution." />
 
-                    <TextBlock Text="MCP advanced" FontWeight="Bold" Margin="0,10,0,4" />
-                    <CheckBox IsChecked="{Binding McpVerboseLogging}" Content="Verbose logging (MCP server)" Margin="0,2" />
-                    <CheckBox IsChecked="{Binding McpAutoIntercept}" Content="Context helper: auto-intercept" Margin="0,2" />
-                    <CheckBox IsChecked="{Binding McpAutoWarm}" Content="Context helper: auto-warm on startup" Margin="0,2" />
-                    <CheckBox IsChecked="{Binding McpEnableDistill}" Content="Token economy: distill" Margin="0,2" />
-                    <CheckBox IsChecked="{Binding McpEnableTerse}" Content="Token economy: terse mode" Margin="0,2" />
-                    <CheckBox IsChecked="{Binding McpEnableSavings}" Content="Token economy: savings tracking" Margin="0,2" />
-                    <Grid Margin="0,4,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="170" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
+                                <TextBlock Style="{StaticResource Label}" Text="Behavior config override" />
+                                <TextBox Text="{Binding BehaviorConfigPath}" />
+                                <TextBlock Style="{StaticResource Help}" Text="For development: path to a different config.json. Blank: the workspace's own." />
 
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Context helper size limit" VerticalAlignment="Center" />
-                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding McpCtxSizeLimit}" Margin="0,2" />
-
-                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Endpoint selection" VerticalAlignment="Center" />
-                        <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding EndpointStrategies}"
-                                  SelectedItem="{Binding McpEndpointStrategy}" Margin="0,2" />
-
-                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Endpoints (name|url|primary|models; one per line)" TextWrapping="Wrap" />
-                        <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding McpEndpoints}" Margin="0,2" Height="80"
-                                 AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" />
-                    </Grid>
-
-                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                        <Button Content="Save" Command="{Binding SaveCommand}" />
-                        <Button Content="Reload" Command="{Binding ReloadCommand}" />
+                                <CheckBox IsChecked="{Binding McpDebugLogging}" Content="MCP server debug logging" Margin="0,10,0,0" />
+                                <TextBlock Style="{StaticResource CheckHelp}" Text="Sets the server's console log level to Debug." />
+                            </StackPanel>
+                        </Expander>
                     </StackPanel>
+                </ScrollViewer>
 
-                    <TextBlock Text="{Binding Status}" Margin="0,10,0,0" TextWrapping="Wrap" />
+                <StackPanel Grid.Row="1" Margin="4,8,12,4">
+                    <TextBlock Style="{StaticResource Help}" Margin="0,0,0,4" Text="{Binding RestartNotice}" />
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="Save" Command="{Binding SaveCommand}" />
+                        <Button Content="Discard changes" Command="{Binding DiscardCommand}" MinWidth="130" />
+                        <Button Content="Restart MCP server" Command="{Binding RestartCommand}" MinWidth="140" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding Status}" Margin="0,6,0,0" TextWrapping="Wrap" />
                 </StackPanel>
-            </ScrollViewer>
+            </Grid>
         </TabItem>
 
         <TabItem Header="Services">
@@ -183,6 +222,7 @@
                     <TextBlock Text="SimpleModelServer" FontWeight="Bold" Margin="0,18,0,4" />
                     <TextBlock Text="{Binding SimpleModelServerStatus}" Margin="0,0,0,6" />
                     <StackPanel Orientation="Horizontal">
+                        <Button Content="Start" Command="{Binding StartSimpleModelServerCommand}" />
                         <Button Content="Install" Command="{Binding InstallSimpleModelServerCommand}" />
                         <Button Content="Uninstall" Command="{Binding UninstallSimpleModelServerCommand}" />
                     </StackPanel>

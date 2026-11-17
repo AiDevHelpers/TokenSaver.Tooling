@@ -97,9 +97,10 @@ public sealed class TokenSaverExtension : IDisposable
     /// <summary>
     /// Starts TokenSaver.MCP server.
     /// </summary>
-    public async Task StartServerAsync(int port = 11436, TimeSpan? timeout = null)
+    public async Task StartServerAsync(int? mcpPort = null, TimeSpan? timeout = null)
     {
-        timeout ??= TimeSpan.FromSeconds(30);
+        var port = mcpPort ?? ExtensionSettings.McpPort;
+        timeout ??= ExtensionSettings.McpStartTimeout;
         _logger.LogInfo($"Starting TokenSaver.MCP on port {port}...");
 
         // Check if service is installed and use it
@@ -137,11 +138,11 @@ public sealed class TokenSaverExtension : IDisposable
     /// <summary>
     /// Checks the health of the TokenSaver.MCP server.
     /// </summary>
-    public async Task<bool> CheckServerHealthAsync(int port = 11436)
+    public async Task<bool> CheckServerHealthAsync(int? mcpPort = null)
     {
         try
         {
-            return await HealthCheckClient.VerifyMcpServerAsync(port);
+            return await HealthCheckClient.VerifyMcpServerAsync(mcpPort ?? ExtensionSettings.McpPort);
         }
         catch (Exception ex)
         {
@@ -153,11 +154,11 @@ public sealed class TokenSaverExtension : IDisposable
     /// <summary>
     /// Gets the full health report from TokenSaver.MCP.
     /// </summary>
-    public async Task<McpHealthReport?> GetFullHealthAsync(int port = 11436)
+    public async Task<McpHealthReport?> GetFullHealthAsync(int? mcpPort = null)
     {
         try
         {
-            return await HealthCheckClient.GetFullHealthAsync(port);
+            return await HealthCheckClient.GetFullHealthAsync(mcpPort ?? ExtensionSettings.McpPort);
         }
         catch (Exception ex)
         {

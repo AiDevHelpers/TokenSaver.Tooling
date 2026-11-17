@@ -29,6 +29,8 @@ internal static class ExtensionLog
 
     private sealed class TraceFallbackLogger : IExtensionLogger
     {
+        public void LogDebug(string message) => Trace.WriteLine($"[TokenSaver] DEBUG: {message}");
+
         public void LogInfo(string message) => Trace.TraceInformation($"[TokenSaver] INFO: {message}");
 
         public void LogError(string message) => Trace.TraceError($"[TokenSaver] ERROR: {message}");

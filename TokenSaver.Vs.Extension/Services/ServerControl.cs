@@ -3,6 +3,7 @@ using System.IO;
 using System.ServiceProcess;
 using System.Threading.Tasks;
 
+using TokenSaver.Vs.Extension.Configuration;
 using TokenSaver.Vs.Extension.Health;
 using TokenSaver.Vs.Extension.Logging;
 using TokenSaver.Vs.Extension.WindowsService;
@@ -30,7 +31,7 @@ internal static class ServerControl
             return NotInstalled;
         }
 
-        await WindowsServiceHelper.StartServiceAsync(ServiceName).ConfigureAwait(false);
+        await WindowsServiceHelper.StartServiceAsync(ServiceName, ExtensionSettings.McpStartTimeout).ConfigureAwait(false);
         return await IsRespondingAsync().ConfigureAwait(false)
             ? "TokenSaver MCP server is running and reachable."
             : "TokenSaver MCP server was started but is not responding yet. See the Logs tab.";
@@ -57,7 +58,7 @@ internal static class ServerControl
         }
 
         await WindowsServiceHelper.StopServiceAsync(ServiceName).ConfigureAwait(false);
-        await WindowsServiceHelper.StartServiceAsync(ServiceName).ConfigureAwait(false);
+        await WindowsServiceHelper.StartServiceAsync(ServiceName, ExtensionSettings.McpStartTimeout).ConfigureAwait(false);
         return "TokenSaver MCP server restarted.";
     }
 
@@ -72,5 +73,5 @@ internal static class ServerControl
     };
 
     /// <summary>True when the MCP server's /health answers healthy. Gives up after a few seconds; never throws.</summary>
-    public static Task<bool> IsRespondingAsync(int port = 11436) => HealthCheckClient.VerifyMcpServerAsync(port);
+    public static Task<bool> IsRespondingAsync() => HealthCheckClient.VerifyMcpServerAsync(ExtensionSettings.McpPort);
 }

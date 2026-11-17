@@ -38,6 +38,7 @@ internal sealed class ServicesViewModel : NotifyPropertyChangedObject, IDisposab
             (await ServiceInstall.InstallAsync(ServiceInstall.McpLabel, ServerControl.ServiceName, ServiceInstall.McpInstallerFile).ConfigureAwait(false)).message);
         UninstallMcpCommand = Action("Uninstalling TokenSaver MCP...", async () =>
             (await ServiceInstall.UninstallAsync(ServiceInstall.McpLabel, ServerControl.ServiceName, ServiceInstall.McpInstallerFile).ConfigureAwait(false)).message);
+        StartSimpleModelServerCommand = Action("Starting SimpleModelServer...", SimpleModelServerControl.StartAsync);
         InstallSimpleModelServerCommand = Action("Installing SimpleModelServer...", async () =>
             (await ServiceInstall.InstallAsync(ServiceInstall.SimpleModelServerLabel, ServiceInstall.SimpleModelServerServiceName, ServiceInstall.SimpleModelServerInstallerFile).ConfigureAwait(false)).message);
         UninstallSimpleModelServerCommand = Action("Uninstalling SimpleModelServer...", async () =>
@@ -57,6 +58,8 @@ internal sealed class ServicesViewModel : NotifyPropertyChangedObject, IDisposab
     [DataMember] public AsyncCommand InstallMcpCommand { get; }
 
     [DataMember] public AsyncCommand UninstallMcpCommand { get; }
+
+    [DataMember] public AsyncCommand StartSimpleModelServerCommand { get; }
 
     [DataMember] public AsyncCommand InstallSimpleModelServerCommand { get; }
 

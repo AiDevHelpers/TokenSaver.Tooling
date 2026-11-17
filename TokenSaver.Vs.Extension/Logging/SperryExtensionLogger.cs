@@ -6,6 +6,8 @@ using Serilog.Events;
 
 using SperryDev.Logger.Configuration;
 
+using TokenSaver.Vs.Extension.Configuration;
+
 namespace TokenSaver.Vs.Extension.Logging;
 
 /// <summary>
@@ -26,11 +28,24 @@ public sealed class SperryExtensionLogger : IExtensionLogger
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    /// <summary>Creates a logger on the SperryDev "VisualStudio" channel at Information level.</summary>
+    /// <summary>
+    /// Creates a logger on the SperryDev "VisualStudio" channel: Information level, or Debug when the extension's
+    /// verbose-logging setting is on. The level is fixed for the life of the process, so the setting applies the
+    /// next time the extension loads.
+    /// </summary>
     public static SperryExtensionLogger Create()
     {
-        s_factory = AppLoggerFactory.Create(Channel, LogEventLevel.Information);
+        var level = ExtensionSettings.VerboseLogging ? LogEventLevel.Debug : LogEventLevel.Information;
+        s_factory = AppLoggerFactory.Create(Channel, level);
         return new SperryExtensionLogger(s_factory.CreateLogger("TokenSaver.Vs.Extension"));
+    }
+
+    public void LogDebug(string message)
+    {
+        if (_logger.IsEnabled(LogLevel.Debug))
+        {
+            _logger.LogDebug("{Message}", message);
+        }
     }
 
     public void LogInfo(string message)

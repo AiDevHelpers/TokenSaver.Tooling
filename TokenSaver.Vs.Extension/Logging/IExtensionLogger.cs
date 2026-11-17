@@ -7,6 +7,9 @@ namespace TokenSaver.Vs.Extension.Logging;
 /// </summary>
 public interface IExtensionLogger
 {
+    /// <summary>Detail that is only written when "Extension debug logging" is on.</summary>
+    void LogDebug(string message);
+
     void LogInfo(string message);
 
     void LogError(string message);

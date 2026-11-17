@@ -17,10 +17,11 @@ namespace TokenSaver.Vs.Extension.Services;
 internal static class FullSetup
 {
     private const string FallbackHealthUrl = "http://localhost:11435/health";
-    private const int McpPort = 11436;
-    private static readonly TimeSpan SimpleModelServerTimeout = TimeSpan.FromMinutes(10);
-    private static readonly TimeSpan McpTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(2);
+
+    private static TimeSpan SimpleModelServerTimeout => ExtensionSettings.SimpleModelServerStartTimeout;
+
+    private static TimeSpan McpTimeout => ExtensionSettings.McpStartTimeout;
 
     /// <summary>Runs the setup. <paramref name="progress"/> gets the step in hand; the result is the final message.</summary>
     public static async Task<string> RunAsync(Action<string> progress, CancellationToken cancellationToken)
@@ -39,7 +40,7 @@ internal static class FullSetup
         }
 
         // Step 2: wait for SimpleModelServer to be healthy, not just installed. Restart it once after a third of the wait.
-        progress($"Full setup: waiting for SimpleModelServer to become healthy (up to {SimpleModelServerTimeout.TotalMinutes:0} minutes)...");
+        progress($"Full setup: waiting for SimpleModelServer to become healthy (up to {SimpleModelServerTimeout.TotalSeconds:0} seconds)...");
         var healthUrl = SimpleModelServerHealthUrl();
         var firstWait = TimeSpan.FromTicks(SimpleModelServerTimeout.Ticks / 3);
         var healthy = await WaitForHealthyAsync(healthUrl, firstWait, cancellationToken).ConfigureAwait(false);
@@ -53,7 +54,7 @@ internal static class FullSetup
 
         if (!healthy)
         {
-            return Fail($"SimpleModelServer did not become healthy within {SimpleModelServerTimeout.TotalMinutes:0} minutes.");
+            return Fail($"SimpleModelServer did not become healthy within {SimpleModelServerTimeout.TotalSeconds:0} seconds.");
         }
 
         // Step 3: TokenSaver MCP service.
@@ -71,7 +72,7 @@ internal static class FullSetup
         progress("Full setup: waiting for TokenSaver MCP to respond...");
         if (!await WaitForMcpAsync(cancellationToken).ConfigureAwait(false))
         {
-            return Fail($"TokenSaver MCP did not respond on port {McpPort} within {McpTimeout.TotalSeconds:0} seconds.");
+            return Fail($"TokenSaver MCP did not respond on port {ExtensionSettings.McpPort} within {McpTimeout.TotalSeconds:0} seconds.");
         }
 
         // Step 5: open the install prompt now that both services are confirmed up.
@@ -85,6 +86,10 @@ internal static class FullSetup
     /// <summary>True when the SimpleModelServer health URL from the settings answers with a success status.</summary>
     public static Task<bool> IsSimpleModelServerHealthyAsync(CancellationToken cancellationToken) =>
         IsOkAsync(SimpleModelServerHealthUrl(), cancellationToken);
+
+    /// <summary>Waits up to the configured SimpleModelServer start timeout for its health URL to answer.</summary>
+    public static Task<bool> WaitForSimpleModelServerHealthyAsync(CancellationToken cancellationToken) =>
+        WaitForHealthyAsync(SimpleModelServerHealthUrl(), SimpleModelServerTimeout, cancellationToken);
 
     private static string Fail(string reason)
     {
@@ -120,7 +125,7 @@ internal static class FullSetup
         var deadline = DateTime.UtcNow + McpTimeout;
         while (DateTime.UtcNow < deadline)
         {
-            if (await ServerControl.IsRespondingAsync(McpPort).ConfigureAwait(false))
+            if (await ServerControl.IsRespondingAsync().ConfigureAwait(false))
             {
                 return true;
             }
