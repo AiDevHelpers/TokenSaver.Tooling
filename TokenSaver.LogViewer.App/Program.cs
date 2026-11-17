@@ -20,8 +20,10 @@ if (string.IsNullOrWhiteSpace(pipeName))
 }
 
 var screen = new Screen();
+#pragma warning disable CA2000, CA2025 // quit lives for the whole process; the key reader ends when it is cancelled at exit.
 var quit = new CancellationTokenSource();
 _ = Task.Run(() => screen.ReadKeysAsync(quit));
+#pragma warning restore CA2000, CA2025
 
 // Reconnects for a short while after the server goes away so a restart of it does not litter tabs, then exits
 // with code 0 so Windows Terminal closes the tab.
