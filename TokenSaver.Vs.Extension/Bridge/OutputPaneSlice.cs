@@ -51,6 +51,9 @@ public static class OutputPaneSlice
         }
 
         byte[] digest = SHA256.HashData(Encoding.UTF8.GetBytes(text.Substring(start, length)));
+        // Lowercase hex is the stable anchor format; an upper-case form would change existing anchors.
+#pragma warning disable CA1308
         return Convert.ToHexString(digest, 0, 16).ToLowerInvariant();
+#pragma warning restore CA1308
     }
 }

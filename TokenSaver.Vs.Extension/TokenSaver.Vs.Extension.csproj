@@ -22,6 +22,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWpf>true</UseWpf>
     <VssdkCompatibleExtension>false</VssdkCompatibleExtension>
+    <!-- VSEXT0010: net10 target vs the .NET 8 the VS extensibility host may load. Suppressed so CI enforcement can run;
+         needs a real check on VS 18 (see docs/plans/codebase-review-fix-plan.md, Q9). -->
+    <NoWarn>$(NoWarn);VSEXT0010</NoWarn>
     <!-- The Output Window extensibility API (Views().Output.CreateOutputChannelAsync, used by the
          SimpleModelServer commands to show responses) is still marked preview by the SDK. -->
     <!-- NU1701: Microsoft.VisualStudio.Sdk (needed for DialogPage/ProvideOptionPageAttribute, see
