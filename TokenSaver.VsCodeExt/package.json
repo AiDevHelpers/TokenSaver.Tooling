@@ -253,7 +253,7 @@
         "tokenSaver.autoCodeHelper.enabled": {
           "type": "boolean",
           "default": false,
-          "description": "Enable CodeHelper auto-workflow: intercepts code-build prompts, requests a skeleton design from the AI, implements what it can, and returns deferred items for the AI to complete.",
+          "description": "Enable the CodeHelper auto-workflow: the code_work tool, and advisory draft-model guidance on allowlisted tool prompts (never writes files by itself).",
           "order": 13
         },
         "tokenSaver.autoInstallPrompt": {
