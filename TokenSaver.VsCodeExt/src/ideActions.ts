@@ -281,7 +281,8 @@ export async function runIdeAction(action: string, args: Args): Promise<unknown>
             };
 
         case "step": {
-            const kind = requireString(args, "kind");
+            // The MCP ide_step tool sends "mode" (as the Visual Studio bridge expects); older callers sent "kind".
+            const kind = optionalString(args, "kind") ?? requireString(args, "mode");
             const commands: Record<string, string> = {
                 over: "workbench.action.debug.stepOver",
                 into: "workbench.action.debug.stepInto",
