@@ -24,6 +24,23 @@ public static class WindowsServiceHelper
         });
     }
 
+    /// <summary>The service's state (Running, Stopped, StartPending...), or null when it is not installed.</summary>
+    public static Task<ServiceControllerStatus?> GetStatusAsync(string serviceName)
+    {
+        return Task.Run<ServiceControllerStatus?>(() =>
+        {
+            try
+            {
+                using var controller = new ServiceController(serviceName);
+                return controller.Status;
+            }
+            catch (InvalidOperationException)
+            {
+                return null;
+            }
+        });
+    }
+
     public static Task StartServiceAsync(string serviceName, TimeSpan? timeout = null)
     {
         return Task.Run(() =>

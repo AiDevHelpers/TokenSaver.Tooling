@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.ServiceProcess;
 using System.Threading.Tasks;
 
 using TokenSaver.Vs.Extension.Logging;
@@ -59,18 +60,34 @@ internal static class ServerControl
         return "TokenSaver MCP server restarted.";
     }
 
-    /// <summary>One-line state of the MCP service: not installed, responding, or not responding.</summary>
+    /// <summary>One-line state of the MCP service, e.g. "Running, server responding", "Stopped" or "Not installed".</summary>
     public static async Task<string> StatusAsync()
     {
-        if (!await WindowsServiceHelper.IsServiceInstalledAsync(ServiceName).ConfigureAwait(false))
+        var state = await WindowsServiceHelper.GetStatusAsync(ServiceName).ConfigureAwait(false);
+        if (state is null)
         {
             return "Not installed";
         }
 
+        if (state != ServiceControllerStatus.Running)
+        {
+            return Describe(state.Value);
+        }
+
         return await IsRespondingAsync().ConfigureAwait(false)
-            ? "Installed, server responding"
-            : "Installed, server not responding";
+            ? "Running, server responding"
+            : "Running, server not responding";
     }
+
+    /// <summary>Service state in words, e.g. StartPending as "Starting".</summary>
+    public static string Describe(ServiceControllerStatus state) => state switch
+    {
+        ServiceControllerStatus.StartPending => "Starting",
+        ServiceControllerStatus.StopPending => "Stopping",
+        ServiceControllerStatus.ContinuePending => "Resuming",
+        ServiceControllerStatus.PausePending => "Pausing",
+        _ => state.ToString(),
+    };
 
     public static async Task<bool> IsRespondingAsync(int port = 11436)
     {

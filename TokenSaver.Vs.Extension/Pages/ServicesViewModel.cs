@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.Serialization;
+using System.ServiceProcess;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -17,12 +18,15 @@ namespace TokenSaver.Vs.Extension.Pages;
 /// <see cref="Message"/> and the states are read again afterwards.
 /// </summary>
 [DataContract]
-internal sealed class ServicesViewModel : NotifyPropertyChangedObject
+internal sealed class ServicesViewModel : NotifyPropertyChangedObject, IDisposable
 {
-    private string _mcpStatus = "";
-    private string _simpleModelServerStatus = "";
+    private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(5);
+
+    private string _mcpStatus = "Checking...";
+    private string _simpleModelServerStatus = "Checking...";
     private string _message = "";
     private int _busy;
+    private Timer? _timer;
 
     public ServicesViewModel()
     {
@@ -71,6 +75,14 @@ internal sealed class ServicesViewModel : NotifyPropertyChangedObject
     /// <summary>Reads both service states again, unless an action is running (it refreshes when it finishes).</summary>
     public Task RefreshAsync() => RunAsync(null, () => Task.FromResult(Message));
 
+    /// <summary>Reads the states now and then every few seconds, so a service stopped outside Visual Studio shows up. Safe to call again.</summary>
+    public void Start()
+    {
+        _timer ??= new Timer(_ => _ = RefreshAsync(), null, TimeSpan.Zero, PollInterval);
+    }
+
+    public void Dispose() => _timer?.Dispose();
+
     private AsyncCommand Action(string working, Func<Task<string>> operation) =>
         new((_, _) => RunAsync(working, operation));
 
@@ -108,14 +120,21 @@ internal sealed class ServicesViewModel : NotifyPropertyChangedObject
     {
         McpStatus = await ServerControl.StatusAsync().ConfigureAwait(false);
 
-        if (!await WindowsServiceHelper.IsServiceInstalledAsync(ServiceInstall.SimpleModelServerServiceName).ConfigureAwait(false))
+        var state = await WindowsServiceHelper.GetStatusAsync(ServiceInstall.SimpleModelServerServiceName).ConfigureAwait(false);
+        if (state is null)
         {
             SimpleModelServerStatus = "Not installed";
             return;
         }
 
+        if (state != ServiceControllerStatus.Running)
+        {
+            SimpleModelServerStatus = ServerControl.Describe(state.Value);
+            return;
+        }
+
         SimpleModelServerStatus = await FullSetup.IsSimpleModelServerHealthyAsync(CancellationToken.None).ConfigureAwait(false)
-            ? "Installed, healthy"
-            : "Installed, not healthy";
+            ? "Running, healthy"
+            : "Running, not healthy yet";
     }
 }

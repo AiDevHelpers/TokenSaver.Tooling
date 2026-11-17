@@ -45,9 +45,13 @@ internal sealed class TokenSaverWindowViewModel : NotifyPropertyChangedObject, I
             Settings.Load();
         }
 
-        _ = Services.RefreshAsync();
+        Services.Start();
         Logs.Start();
     }
 
-    public void Dispose() => Logs.Dispose();
+    public void Dispose()
+    {
+        Services.Dispose();
+        Logs.Dispose();
+    }
 }
