@@ -104,6 +104,86 @@ internal sealed class SettingsViewModel : NotifyPropertyChangedObject
             MarkDirty();
             return Task.CompletedTask;
         });
+        RefreshUsersCommand = new AsyncCommand(async (_, _) => await RefreshUsersAsync().ConfigureAwait(false));
+        AddUserCommand = new AsyncCommand(async (_, _) =>
+        {
+            var account = NewUserAccount.Trim();
+            if (!AuthClient.IsValidAccount(account))
+            {
+                UsersStatus = "Enter a user name or DOMAIN\\name.";
+                return;
+            }
+
+            await ChangeUserAsync(account, add: true).ConfigureAwait(false);
+            NewUserAccount = "";
+        });
+    }
+
+    /// <summary>The port the server listens on, read from the Settings field; the default when it is not a valid number.</summary>
+    private int CurrentPort => int.TryParse(McpPort, NumberStyles.None, CultureInfo.InvariantCulture, out var p) && p is > 0 and <= 65535
+        ? p
+        : ExtensionSettings.DefaultMcpPort;
+
+    /// <summary>Lists the TokenSaver group's members and the local accounts that could be added. Not saved with Save: these call the server directly.</summary>
+    private async Task RefreshUsersAsync()
+    {
+        var token = AuthClient.ReadToken();
+        if (token is null)
+        {
+            UsersStatus = "No readable auth token. Install the service, or ask an administrator to add this account to the TokenSaver Users group.";
+            return;
+        }
+
+        try
+        {
+            var info = await AuthClient.ListAsync(CurrentPort, token).ConfigureAwait(false);
+            AuthUsers.Clear();
+            foreach (var member in info.Members)
+            {
+                AuthUsers.Add(new AuthUserRow(member, isMember: true, row => ChangeUserAsync(row.Account, add: false)));
+            }
+
+            foreach (var candidate in info.Candidates.Where(c => !info.Members.Contains(c, StringComparer.OrdinalIgnoreCase)))
+            {
+                AuthUsers.Add(new AuthUserRow(candidate, isMember: false, row => ChangeUserAsync(row.Account, add: true)));
+            }
+
+            UsersStatus = $"Group: {info.Group}";
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.Net.Http.HttpRequestException or TaskCanceledException)
+        {
+            UsersStatus = ex.Message;
+        }
+    }
+
+    private async Task ChangeUserAsync(string account, bool add)
+    {
+        var token = AuthClient.ReadToken();
+        if (token is null)
+        {
+            UsersStatus = "No readable auth token, so users cannot be changed from this account.";
+            return;
+        }
+
+        try
+        {
+            if (add)
+            {
+                await AuthClient.AddAsync(CurrentPort, token, account).ConfigureAwait(false);
+            }
+            else
+            {
+                await AuthClient.RemoveAsync(CurrentPort, token, account).ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.Net.Http.HttpRequestException or TaskCanceledException)
+        {
+            UsersStatus = ex.Message;
+            return;
+        }
+
+        await RefreshUsersAsync().ConfigureAwait(false);
+        UsersStatus = (add ? "Added " : "Removed ") + account + ". " + UsersStatus;
     }
 
     [DataMember] public AsyncCommand SaveCommand { get; }
@@ -113,6 +193,20 @@ internal sealed class SettingsViewModel : NotifyPropertyChangedObject
     [DataMember] public AsyncCommand RestartCommand { get; }
 
     [DataMember] public AsyncCommand AddEndpointCommand { get; }
+
+    // Users: who may read the endpoint token (the TokenSaver Users local group).
+    private string _usersStatus = "Click Refresh to load the users.";
+    private string _newUserAccount = "";
+
+    [DataMember] public AsyncCommand RefreshUsersCommand { get; }
+
+    [DataMember] public AsyncCommand AddUserCommand { get; }
+
+    [DataMember] public ObservableList<AuthUserRow> AuthUsers { get; } = [];
+
+    [DataMember] public string UsersStatus { get => _usersStatus; set => SetProperty(ref _usersStatus, value); }
+
+    [DataMember] public string NewUserAccount { get => _newUserAccount; set => SetProperty(ref _newUserAccount, value); }
 
     [DataMember] public IReadOnlyList<string> TestRunners { get; } = [TestExplorer, DotnetTest];
 

@@ -159,6 +159,14 @@ silently staying quiet.)
   `tokenSaver.server.port` VS Code setting — check `.vscode/settings.json` or the user's
   global settings if unsure).
 - **HTTP endpoint**: `http://localhost:<port>/mcp` (e.g. `http://localhost:11436/mcp`).
+- **Auth token** (HTTP options only): every request to `/mcp` and `/api/*` must send
+  `Authorization: Bearer <TOKEN>`, and requests with a browser `Origin` or a non-loopback `Host`
+  are refused. The token is the contents of `%ProgramData%\TokenSaver\auth-token` (or
+  `%LOCALAPPDATA%\TokenSaver\auth-token` for a dev run). Your Windows account must be a member
+  of the **TokenSaver Users** group to read it: use "TokenSaver: Manage Users" in VS Code (or
+  an administrator can add you), then "TokenSaver: Copy Auth Token" to copy it. Put it in the
+  client's `headers` as shown in that client's file. `/health` needs no token. The stdio option
+  needs no token.
 - **stdio binary path**: `C:\Program Files\TokenSaver\TokenSaver.MCP.exe` — this is where the
   bundled MSI installs it (see "Installing TokenSaver.MCP" above). If the user is running
   TokenSaver in dev mode (via `dotnet run`), there is no installed exe to point stdio at; use

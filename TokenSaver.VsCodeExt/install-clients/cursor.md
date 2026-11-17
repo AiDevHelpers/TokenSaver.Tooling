@@ -10,7 +10,8 @@ Config file: `~/.cursor/mcp.json` (preferred) or `%APPDATA%\Cursor\User\mcp.json
 {
   "mcpServers": {
     "TokenSaver": {
-      "url": "http://localhost:11436/mcp"
+      "url": "http://localhost:11436/mcp",
+      "headers": { "Authorization": "Bearer <TOKEN>" }
     }
   }
 }

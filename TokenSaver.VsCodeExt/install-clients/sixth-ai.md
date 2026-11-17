@@ -28,6 +28,7 @@ key `mcpServers`. The `"disabled": false` field is required; Sixth ignores entri
   "mcpServers": {
     "TokenSaver": {
       "url": "http://localhost:11436/mcp",
+      "headers": { "Authorization": "Bearer <TOKEN>" },
       "disabled": false
     }
   }

@@ -17,6 +17,9 @@ mcpServers:
   - name: TokenSaver
     type: streamable-http
     url: http://localhost:11436/mcp
+    requestOptions:
+      headers:
+        Authorization: Bearer <TOKEN>
 ```
 
 `config.json`:
@@ -26,7 +29,8 @@ mcpServers:
   "mcpServers": {
     "TokenSaver": {
       "type": "streamable-http",
-      "url": "http://localhost:11436/mcp"
+      "url": "http://localhost:11436/mcp",
+      "requestOptions": { "headers": { "Authorization": "Bearer <TOKEN>" } }
     }
   }
 }

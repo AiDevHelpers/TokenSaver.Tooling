@@ -1,5 +1,15 @@
 import * as vscode from "vscode";
 import { startIdeBridge } from "./ideBridge.js";
+import {
+    addAuthUser,
+    authHeaders,
+    buildUserPickItems,
+    isServerAlive,
+    isValidAccount,
+    listAuthUsers,
+    readAuthToken,
+    removeAuthUser,
+} from "./auth.js";
 import { spawn } from "child_process";
 import * as net from "node:net";
 import * as path from "path";
@@ -285,6 +295,23 @@ export async function activate(context: vscode.ExtensionContext) {
         }),
         vscode.commands.registerCommand("tokenSaver.runFullSetup", async () => {
             await runFullSetup(context);
+        }),
+        vscode.commands.registerCommand("tokenSaver.manageUsers", async () => {
+            await manageUsers();
+        }),
+        vscode.commands.registerCommand("tokenSaver.copyAuthToken", async () => {
+            const token = await currentAuthToken();
+            if (!token) {
+                void vscode.window.showWarningMessage(
+                    "TokenSaver: no readable auth token. Install the service, or ask an administrator to add you to the TokenSaver group.",
+                );
+                return;
+            }
+
+            await vscode.env.clipboard.writeText(token);
+            void vscode.window.showInformationMessage(
+                "TokenSaver: auth token copied. Use it as the Bearer token in your AI client's MCP config.",
+            );
         }),
         vscode.commands.registerCommand(
             "tokenSaver.toggleAutoCodeHelper",
@@ -593,6 +620,63 @@ async function ensureInstalled(context: vscode.ExtensionContext) {
     }
 }
 
+/** The endpoint token (tokenSaver.auth.tokenPath, else the default locations), or undefined when unreadable. */
+async function currentAuthToken(): Promise<string | undefined> {
+    const cfg = vscode.workspace.getConfiguration("tokenSaver");
+    return readAuthToken(cfg.get<string>("auth.tokenPath", ""));
+}
+
+/** Quick pick over the TokenSaver user group: select a member to remove it, a local account to add it. */
+async function manageUsers(): Promise<void> {
+    const cfg = vscode.workspace.getConfiguration("tokenSaver");
+    const port = actualServerPort ?? cfg.get<number>("server.port", 11436);
+    const token = await currentAuthToken();
+    if (!token) {
+        void vscode.window.showWarningMessage(
+            "TokenSaver: no readable auth token, so users cannot be managed from this account.",
+        );
+        return;
+    }
+
+    try {
+        const info = await listAuthUsers(port, token);
+        const items = buildUserPickItems(info);
+        const picked = await vscode.window.showQuickPick(
+            [
+                ...items,
+                { label: "$(add) Enter another account…", description: "DOMAIN\\name", account: "", action: "add" as const },
+            ],
+            { title: `TokenSaver users (group: ${info.group})`, placeHolder: "Select a member to remove or an account to add" },
+        );
+        if (!picked) {
+            return;
+        }
+
+        let account = picked.account;
+        if (account === "") {
+            const typed = await vscode.window.showInputBox({
+                prompt: "Account to add (DOMAIN\\name or name)",
+                validateInput: (v) => (isValidAccount(v) ? undefined : "Not a valid account name"),
+            });
+            if (!typed) {
+                return;
+            }
+
+            account = typed;
+        }
+
+        if (picked.action === "remove") {
+            await removeAuthUser(port, token, account);
+            void vscode.window.showInformationMessage(`TokenSaver: removed ${account}.`);
+        } else {
+            await addAuthUser(port, token, account);
+            void vscode.window.showInformationMessage(`TokenSaver: added ${account}.`);
+        }
+    } catch (err) {
+        void vscode.window.showErrorMessage(`TokenSaver: ${(err as Error).message}`);
+    }
+}
+
 /** Hits the MCP /mcp endpoint after startup. If unreachable, restarts the MCP server. */
 async function checkMcpHealth(): Promise<boolean> {
     const cfg = vscode.workspace.getConfiguration("tokenSaver");
@@ -601,8 +685,12 @@ async function checkMcpHealth(): Promise<boolean> {
     const url = `http://127.0.0.1:${port}/mcp`;
 
     try {
-        const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
-        if (res.ok || res.status === 405) {
+        const res = await fetch(url, {
+            headers: authHeaders(await currentAuthToken()),
+            signal: AbortSignal.timeout(5000),
+        });
+        // 401 means the server is up but did not accept (or we could not read) the token: not a reason to restart.
+        if (isServerAlive(res.status)) {
             log("MCP server health: ok");
             return true;
         }
@@ -1735,9 +1823,9 @@ async function verifyMcpServer(
         // (IPv6) when the server only listens on 0.0.0.0 (IPv4).
         const res = await fetch(
             `http://127.0.0.1:${port}/mcp`,
-            { signal: AbortSignal.timeout(timeoutMs) },
+            { headers: authHeaders(await currentAuthToken()), signal: AbortSignal.timeout(timeoutMs) },
         );
-        return res.ok || res.status === 405;
+        return isServerAlive(res.status);
     } catch {
         return false;
     }

@@ -265,6 +265,38 @@
                             </StackPanel>
                         </Border>
 
+                        <!-- Who may use the endpoint (TokenSaver Users group) -->
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <Grid>
+                                    <Border Style="{StaticResource CardTint}" />
+                                    <Border Style="{StaticResource CardHeader}">
+                                        <StackPanel>
+                                            <TextBlock Style="{StaticResource CardTitle}" Text="Users" />
+                                            <TextBlock Style="{StaticResource Help}" Margin="0,2,0,0" Text="Accounts in the TokenSaver Users group can read the endpoint token. Changes apply at once; they are not part of Save." />
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                                <StackPanel Style="{StaticResource CardBody}">
+                                    <Button Content="Refresh" Command="{Binding RefreshUsersCommand}" HorizontalAlignment="Left" />
+                                    <TextBlock Style="{StaticResource Help}" Text="{Binding UsersStatus}" />
+                                    <ItemsControl ItemsSource="{Binding AuthUsers}" Margin="0,8,0,0">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" Margin="0,2">
+                                                    <Button Content="{Binding ActionText}" Command="{Binding ToggleCommand}" MinWidth="72" Margin="0,0,12,0" />
+                                                    <TextBlock Text="{Binding Account}" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock Style="{StaticResource Label}" Text="Add another account (DOMAIN\name)" />
+                                    <TextBox Text="{Binding NewUserAccount}" AutomationProperties.Name="Account to add" />
+                                    <Button Content="Add user" Command="{Binding AddUserCommand}" Margin="0,8,0,0" HorizontalAlignment="Left" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
                         <!-- Visual Studio extension -->
                         <Border Style="{StaticResource Card}">
                             <StackPanel>

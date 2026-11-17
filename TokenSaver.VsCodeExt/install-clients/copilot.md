@@ -12,7 +12,8 @@ precedence for that workspace.
   "servers": {
     "TokenSaver": {
       "type": "http",
-      "url": "http://localhost:11436/mcp"
+      "url": "http://localhost:11436/mcp",
+      "headers": { "Authorization": "Bearer <TOKEN>" }
     }
   }
 }

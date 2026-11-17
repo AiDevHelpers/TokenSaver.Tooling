@@ -11,7 +11,8 @@ A project-level `.mcp.json` also works if you only want it scoped to one repo.
   "mcpServers": {
     "TokenSaver": {
       "type": "http",
-      "url": "http://localhost:11436/mcp"
+      "url": "http://localhost:11436/mcp",
+      "headers": { "Authorization": "Bearer <TOKEN>" }
     }
   }
 }

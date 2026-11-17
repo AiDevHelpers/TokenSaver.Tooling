@@ -101,6 +101,16 @@
         "category": "TokenSaver"
       },
       {
+        "command": "tokenSaver.manageUsers",
+        "title": "Manage Users (who may use the TokenSaver endpoint)",
+        "category": "TokenSaver"
+      },
+      {
+        "command": "tokenSaver.copyAuthToken",
+        "title": "Copy Auth Token (for AI client MCP config)",
+        "category": "TokenSaver"
+      },
+      {
         "command": "tokenSaver.runFullSetup",
         "title": "Run Full Setup (Install SimpleModelServer + TokenSaver, wait for both to be ready, open AI instructions)",
         "category": "TokenSaver"
@@ -150,6 +160,14 @@
         },
         {
           "command": "tokenSaver.openInstallPrompt",
+          "when": "true"
+        },
+        {
+          "command": "tokenSaver.manageUsers",
+          "when": "true"
+        },
+        {
+          "command": "tokenSaver.copyAuthToken",
           "when": "true"
         },
         {
@@ -255,6 +273,12 @@
           "default": false,
           "description": "Enable the CodeHelper auto-workflow: the code_work tool, and advisory draft-model guidance on allowlisted tool prompts (never writes files by itself).",
           "order": 13
+        },
+        "tokenSaver.auth.tokenPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path of the TokenSaver endpoint token file. Empty uses %ProgramData%\\TokenSaver\\auth-token, then %LOCALAPPDATA%\\TokenSaver\\auth-token. Your account must be in the TokenSaver Users group to read it (see 'TokenSaver: Manage Users').",
+          "order": 14
         },
         "tokenSaver.autoInstallPrompt": {
           "type": "boolean",
