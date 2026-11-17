@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 using Microsoft.VisualStudio.Extensibility.UI;
 
+using TokenSaver.Vs.Extension.Bridge;
 using TokenSaver.Vs.Extension.Logging;
 using TokenSaver.Vs.Extension.Services;
 using TokenSaver.Vs.Extension.WindowsService;
@@ -24,6 +25,7 @@ internal sealed class ServicesViewModel : NotifyPropertyChangedObject, IDisposab
 
     private string _mcpStatus = "Checking...";
     private string _simpleModelServerStatus = "Checking...";
+    private string _bridgeStatus = "Checking...";
     private string _message = "";
     private int _busy;
     private Timer? _timer;
@@ -45,6 +47,8 @@ internal sealed class ServicesViewModel : NotifyPropertyChangedObject, IDisposab
             (await ServiceInstall.UninstallAsync(ServiceInstall.SimpleModelServerLabel, ServiceInstall.SimpleModelServerServiceName, ServiceInstall.SimpleModelServerInstallerFile).ConfigureAwait(false)).message);
         FullSetupCommand = Action("Running full setup...", () => FullSetup.RunAsync(step => Message = step, CancellationToken.None));
         InstallPromptCommand = Action("Opening the install prompt...", () => Task.FromResult(InstallPrompt.Open() ?? "Install prompt opened."));
+        StartBridgeCommand = Action("Starting the IDE bridge...", () => Task.FromResult(BridgeControl.Start()));
+        StopBridgeCommand = Action("Stopping the IDE bridge...", () => Task.FromResult(BridgeControl.Stop()));
     }
 
     [DataMember] public AsyncCommand RefreshCommand { get; }
@@ -69,9 +73,15 @@ internal sealed class ServicesViewModel : NotifyPropertyChangedObject, IDisposab
 
     [DataMember] public AsyncCommand InstallPromptCommand { get; }
 
+    [DataMember] public AsyncCommand StartBridgeCommand { get; }
+
+    [DataMember] public AsyncCommand StopBridgeCommand { get; }
+
     [DataMember] public string McpStatus { get => _mcpStatus; set => SetProperty(ref _mcpStatus, value); }
 
     [DataMember] public string SimpleModelServerStatus { get => _simpleModelServerStatus; set => SetProperty(ref _simpleModelServerStatus, value); }
+
+    [DataMember] public string BridgeStatus { get => _bridgeStatus; set => SetProperty(ref _bridgeStatus, value); }
 
     [DataMember] public string Message { get => _message; set => SetProperty(ref _message, value); }
 
@@ -119,9 +129,13 @@ internal sealed class ServicesViewModel : NotifyPropertyChangedObject, IDisposab
         }
     }
 
-    private Task ReadStatusAsync() => Task.WhenAll(
-        ReadOneAsync(ServerControl.ServiceName, text => McpStatus = text, () => ServerControl.IsRespondingAsync(), "server responding", "server not responding"),
-        ReadOneAsync(ServiceInstall.SimpleModelServerServiceName, text => SimpleModelServerStatus = text, () => FullSetup.IsSimpleModelServerHealthyAsync(CancellationToken.None), "healthy", "not healthy yet"));
+    private Task ReadStatusAsync()
+    {
+        BridgeStatus = BridgeControl.Describe();
+        return Task.WhenAll(
+            ReadOneAsync(ServerControl.ServiceName, text => McpStatus = text, () => ServerControl.IsRespondingAsync(), "server responding", "server not responding"),
+            ReadOneAsync(ServiceInstall.SimpleModelServerServiceName, text => SimpleModelServerStatus = text, () => FullSetup.IsSimpleModelServerHealthyAsync(CancellationToken.None), "healthy", "not healthy yet"));
+    }
 
     /// <summary>
     /// Publishes one service's state. The service state is shown first and the health answer is added when it

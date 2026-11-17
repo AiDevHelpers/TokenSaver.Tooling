@@ -26,7 +26,7 @@ internal sealed class BridgeServer : IDisposable
     private readonly Func<string, JsonElement, Task<object>> _invoke;
     private readonly Func<string?> _solutionPath;
     private readonly IExtensionLogger _logger;
-    private readonly CancellationTokenSource _cts = new();
+    private CancellationTokenSource _cts = new();
     private Task? _loop;
     private DateTime? _startedUtc;
     private DateTime? _lastRequestUtc;
@@ -54,9 +54,14 @@ internal sealed class BridgeServer : IDisposable
             return;
         }
 
+        _cts = new CancellationTokenSource();
         _startedUtc = DateTime.UtcNow;
-        _loop = Task.Run(() => RunAsync(_cts.Token));
+        var ct = _cts.Token;
+        _loop = Task.Run(() => RunAsync(ct));
     }
+
+    /// <summary>Cancels the listen loop. <see cref="Start"/> can run it again.</summary>
+    public void Stop() => _cts.Cancel();
 
     private async Task RunAsync(CancellationToken ct)
     {

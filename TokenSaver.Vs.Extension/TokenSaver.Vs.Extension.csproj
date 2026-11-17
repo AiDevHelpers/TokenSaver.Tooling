@@ -83,6 +83,11 @@
              IncludeInVSIX="true" />
   </ItemGroup>
 
+  <!-- Lets the test project exercise the internal bridge listener (BridgeServer) directly. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="TokenSaver.Vs.Extension.Tests" />
+  </ItemGroup>
+
   <!-- Override the repo-wide Nerdbank.GitVersioning (3.9.50, injected by Directory.Build.props)
        up to 3.10.91 via Update so there is no duplicate PackageReference. -->
   <ItemGroup>

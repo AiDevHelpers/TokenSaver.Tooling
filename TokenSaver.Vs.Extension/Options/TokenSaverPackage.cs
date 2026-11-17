@@ -56,8 +56,9 @@ public sealed class TokenSaverPackage : AsyncPackage, IDisposable
         _solutionPath = NullIfEmpty(dte.Solution?.FullName);
 
         var actions = new IdeActions(dte);
+        var pipeName = InstanceRegistry.PipeNameFor(pid);
         _bridge = new BridgeServer(
-            InstanceRegistry.PipeNameFor(pid),
+            pipeName,
             async (action, args) =>
             {
                 await JoinableTaskFactory.SwitchToMainThreadAsync();
@@ -66,6 +67,7 @@ public sealed class TokenSaverPackage : AsyncPackage, IDisposable
             () => _solutionPath,
             logger);
         _bridge.Start();
+        BridgeControl.Attach(_bridge, pid, pipeName, () => _solutionPath);
 
         InstanceRegistry.Write(pid, _solutionPath);
 
@@ -86,6 +88,12 @@ public sealed class TokenSaverPackage : AsyncPackage, IDisposable
     {
         try
         {
+            // A bridge the user stopped stays stopped, and its registry entry stays removed, until Start is pressed.
+            if (BridgeControl.UserStopped)
+            {
+                return;
+            }
+
             if (_bridge is { IsRunning: false })
             {
                 ExtensionLog.Logger.LogError("TokenSaver bridge stopped; restarting it.");
