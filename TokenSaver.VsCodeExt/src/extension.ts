@@ -20,6 +20,8 @@ import {
 import { installWindowsService, uninstallWindowsService, type ServiceInstallerDeps, type WindowsServiceSpec } from "./serviceInstaller.js";
 import { waitForHealthOk } from "./health.js";
 import { isServiceInstalled, runSc, runMsiexec } from "./windowsServices.js";
+import { maybePromptAddTokenSaverToGitignore as maybePromptGitignore, migrateLegacySettings } from "./configPrompts.js";
+import { openInstallPrompt, registerMcpProvider as registerMcpProviderFlow } from "./installPrompt.js";
 
 let channelTokenSaver: vscode.OutputChannel;
 let channelSimpleModelServer: vscode.OutputChannel;
@@ -86,162 +88,10 @@ const mcpServer: McpServerProcess = new McpServerProcess({
 // The extension has direct UI access (showInformationMessage), so it asks the user itself
 // instead of relaying through the AI the way the MCP-side GitignorePrompt has to.
 
-interface RepoHelperBehaviorConfig {
-    addTokenSaverToGitignore?: boolean | null;
-    optimizeInstructions?: boolean | null;
-}
+// Config files and first-run prompts live in behaviorConfigFile.ts, configPrompts.ts.
 
-interface TokenSaverBehaviorConfig {
-    repoHelper?: RepoHelperBehaviorConfig | null;
-}
-
-function globalBehaviorConfigPath(): string {
-    const programData = process.env["ProgramData"] ?? "C:\\ProgramData";
-    return path.join(programData, "TokenSaver", "config.json");
-}
-
-function localBehaviorConfigPath(workspaceRoot: string): string {
-    return path.join(workspaceRoot, ".tokensaver", "config.json");
-}
-
-function readBehaviorConfigFile(filePath: string): TokenSaverBehaviorConfig | null {
-    try {
-        if (!fs.existsSync(filePath)) return null;
-        const text = fs.readFileSync(filePath, "utf8");
-        if (!text.trim()) return null;
-        return JSON.parse(text) as TokenSaverBehaviorConfig;
-    } catch (err) {
-        log(`Failed to read behavior config ${filePath}: ${(err as Error).message}`);
-        return null;
-    }
-}
-
-function readMergedBehaviorConfig(workspaceRoot: string): RepoHelperBehaviorConfig {
-    const local = readBehaviorConfigFile(localBehaviorConfigPath(workspaceRoot));
-    const global = readBehaviorConfigFile(globalBehaviorConfigPath());
-    return {
-        addTokenSaverToGitignore:
-            local?.repoHelper?.addTokenSaverToGitignore ?? global?.repoHelper?.addTokenSaverToGitignore ?? null,
-    };
-}
-
-function writeBehaviorConfigValue(filePath: string, mutate: (cfg: TokenSaverBehaviorConfig) => TokenSaverBehaviorConfig) {
-    const current = readBehaviorConfigFile(filePath) ?? {};
-    const updated = mutate(current);
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, JSON.stringify(updated, null, 2) + "\n", "utf8");
-}
-
-/** Mirrors GitignoreFilter.EntryIsCovered (TokenSaver.Library) — is `.tokensaver` already in .gitignore? */
-function gitignoreCoversTokenSaver(workspaceRoot: string): boolean {
-    const gitignorePath = path.join(workspaceRoot, ".gitignore");
-    if (!fs.existsSync(gitignorePath)) return false;
-
-    const normalised = ".tokensaver";
-    let text: string;
-    try {
-        text = fs.readFileSync(gitignorePath, "utf8");
-    } catch {
-        return false;
-    }
-
-    for (const raw of text.split(/\r?\n/)) {
-        const line = raw.trim();
-        if (!line || line.startsWith("#") || line.startsWith("!")) continue;
-        const stripped = line.replace(/\/+$/, "").replace(/^\/+/, "");
-        if (!stripped) continue;
-        if (
-            normalised.toLowerCase() === stripped.toLowerCase() ||
-            normalised.toLowerCase().startsWith(stripped.toLowerCase() + "/")
-        ) {
-            return true;
-        }
-    }
-    return false;
-}
-
-/**
- * On activation, if no workspace/global config has ever answered whether `.tokensaver/` should
- * be added to `.gitignore`, and it's not already covered there, asks the user directly (native
- * VS Code prompt) and persists the answer to `.tokensaver/config.json` (local) or
- * `%ProgramData%\TokenSaver\config.json` (global), matching TokenSaver.Config's local-wins-over-
- * global merge rule. No-ops outside a workspace folder.
- */
-async function maybePromptAddTokenSaverToGitignore(): Promise<void> {
-    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!workspaceRoot) return;
-
-    const merged = readMergedBehaviorConfig(workspaceRoot);
-    if (merged.addTokenSaverToGitignore !== null && merged.addTokenSaverToGitignore !== undefined) return;
-    if (gitignoreCoversTokenSaver(workspaceRoot)) return;
-
-    const choice = await vscode.window.showInformationMessage(
-        "TokenSaver writes its cache to `.tokensaver/`, which isn't in this workspace's .gitignore. Add it?",
-        "Add (this workspace only)",
-        "Add (remember for all workspaces)",
-        "Don't add",
-    );
-    if (choice === undefined) return; // dismissed — ask again next activation
-
-    const add = choice !== "Don't add";
-    const scopeGlobal = choice === "Add (remember for all workspaces)";
-    const targetPath = scopeGlobal ? globalBehaviorConfigPath() : localBehaviorConfigPath(workspaceRoot);
-
-    try {
-        writeBehaviorConfigValue(targetPath, (cfg) => ({
-            ...cfg,
-            repoHelper: { ...cfg.repoHelper, addTokenSaverToGitignore: add },
-        }));
-    } catch (err) {
-        log(`Failed to persist gitignore preference to ${targetPath}: ${(err as Error).message}`);
-    }
-
-    if (add) {
-        const gitignorePath = path.join(workspaceRoot, ".gitignore");
-        try {
-            const existing = fs.existsSync(gitignorePath) ? fs.readFileSync(gitignorePath, "utf8") : "";
-            const needsNewline = existing.length > 0 && !existing.endsWith("\n");
-            fs.writeFileSync(gitignorePath, existing + (needsNewline ? "\n" : "") + ".tokensaver/\n", "utf8");
-            log("Added `.tokensaver/` to .gitignore.");
-        } catch (err) {
-            log(`Failed to update .gitignore: ${(err as Error).message}`);
-        }
-    }
-}
-
-/**
- * One-time migration for the "localHelper.*" -> "tokenSaver.*" settings section rename.
- * Copies any explicitly-set value under the old section into the new one, provided the new
- * key hasn't already been explicitly set (so a user's later "tokenSaver.*" edit always wins).
- * Does not delete the old values — VS Code settings.json is user-owned, and leaving the old
- * keys in place is harmless now that nothing reads them.
- */
-function migrateLegacySettings() {
-    const oldCfg = vscode.workspace.getConfiguration("localHelper");
-    const newCfg = vscode.workspace.getConfiguration("tokenSaver");
-    const keys = [
-        "autostart", "server.port", "server.startTimeout", "server.idleTimeout",
-        "dotnet.command", "dotnet.projectPath", "notifications.enabled", "notifications.level",
-        "verboseLogging", "simpleModelServer.exePath", "mcp.exePath", "simpleModelServer.healthUrl",
-        "simpleModelServer.startTimeout", "autoCodeHelper.enabled", "autoInstallPrompt",
-    ];
-    for (const key of keys) {
-        const oldInspect = oldCfg.inspect(key);
-        const oldValue = oldInspect?.globalValue ?? oldInspect?.workspaceValue;
-        if (oldValue === undefined) {
-            continue;
-        }
-
-        const newInspect = newCfg.inspect(key);
-        if (newInspect?.globalValue !== undefined || newInspect?.workspaceValue !== undefined) {
-            continue;
-        }
-
-        const target = oldInspect?.workspaceValue !== undefined
-            ? vscode.ConfigurationTarget.Workspace
-            : vscode.ConfigurationTarget.Global;
-        void newCfg.update(key, oldValue, target);
-    }
+function maybePromptAddTokenSaverToGitignore(): Promise<void> {
+    return maybePromptGitignore((message) => log(message));
 }
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -607,6 +457,17 @@ async function ensureInstalled(context: vscode.ExtensionContext): Promise<void> 
 
 // ─── Health, users and status (the logic lives in mcpHealth.ts, userManagement.ts and statusUi.ts) ─
 
+function registerMcpProvider(context: vscode.ExtensionContext): void {
+    registerMcpProviderFlow(context, {
+        log: (message) => log(message),
+        startServers: async () => {
+            await simpleModelServer.start();
+            await mcpServer.start();
+        },
+        port: () => mcpPort(),
+    });
+}
+
 function mcpPort(): number {
     return mcpServer.port ?? vscode.workspace.getConfiguration("tokenSaver").get<number>("server.port", 11436);
 }
@@ -691,24 +552,6 @@ function notify(type: "info" | "error", message: string): void {
 
 // ─── Manual install prompt (VS Code Copilot, Claude Code, Cursor, Sixth, Continue) ──────────
 
-/**
- * Opens INSTALL_PROMPT.md — instructions an AI agent (or the user) can follow to
- * manually wire up the TokenSaver MCP server in any supported provider (VS Code
- * Copilot, Claude Code, Cursor, Sixth AI, Continue), for either httpStreaming or
- * stdio transport. Replaces the old auto-write-every-provider's-config approach,
- * which proved unreliable across each provider's config format.
- */
-async function openInstallPrompt(context: vscode.ExtensionContext) {
-    const promptPath = path.join(context.extensionPath, "INSTALL_PROMPT.md");
-    if (!fs.existsSync(promptPath)) {
-        vscode.window.showErrorMessage(
-            `TokenSaver: INSTALL_PROMPT.md not found at ${promptPath}`,
-        );
-        return;
-    }
-    const doc = await vscode.workspace.openTextDocument(promptPath);
-    await vscode.window.showTextDocument(doc, { preview: false });
-}
 
 // NOTE: TokenSaver used to call /api/register-providers on startup (registerWithAiProviders)
 // to auto-write its entry into every detected AI client config (Claude Desktop, Claude Code,
@@ -717,48 +560,6 @@ async function openInstallPrompt(context: vscode.ExtensionContext) {
 
 // ─── MCP provider ────────────────────────────────────────────────────────────
 
-function registerMcpProvider(context: vscode.ExtensionContext) {
-    try {
-        if (
-            typeof vscode.lm?.registerMcpServerDefinitionProvider === "function"
-        ) {
-            const provider: vscode.McpServerDefinitionProvider = {
-                async provideMcpServerDefinitions() {
-                    await simpleModelServer.start();
-                    await mcpServer.start();
-                    const port =
-                        mcpServer.port ??
-                        vscode.workspace
-                            .getConfiguration("tokenSaver")
-                            .get<number>("server.port", 11436);
-                    return [
-                        new vscode.McpHttpServerDefinition(
-                            "TokenSaver",
-                            vscode.Uri.parse(`http://localhost:${port}`),
-                            {},
-                            "1.0.0",
-                        ),
-                    ];
-                },
-                async resolveMcpServerDefinition(
-                    server,
-                ) {
-                    await simpleModelServer.start();
-                    await mcpServer.start();
-                    return server;
-                },
-            };
-            context.subscriptions.push(
-                vscode.lm.registerMcpServerDefinitionProvider(
-                    "TokenSaver",
-                    provider,
-                ),
-            );
-        }
-    } catch (err) {
-        log(`Failed to register MCP provider: ${(err as Error).message}`);
-    }
-}
 
 // ─── Slow-response health check ──────────────────────────────────────────────
 
