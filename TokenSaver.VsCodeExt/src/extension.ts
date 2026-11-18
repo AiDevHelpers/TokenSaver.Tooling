@@ -10,13 +10,12 @@ import {
     readAuthToken,
     removeAuthUser,
 } from "./auth.js";
-import { spawn } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
 import { ServiceEventLogPoller } from "./serviceEventLog.js";
 import { McpServerProcess, TOKENSAVER_SERVICE_NAME } from "./mcpServerProcess.js";
-import { isPortOpen, waitForPortOpen } from "./net.js";
-import { fetchHealthOk, waitForHealthOk } from "./health.js";
+import { SimpleModelServerProcess, SIMPLEMODEL_SERVER_SERVICE_NAME } from "./simpleModelServerProcess.js";
+import { waitForHealthOk } from "./health.js";
 import { isServiceInstalled, runSc, runMsiexec } from "./windowsServices.js";
 
 let channelTokenSaver: vscode.OutputChannel;
@@ -35,9 +34,17 @@ const tokenSaverEventLog: ServiceEventLogPoller = new ServiceEventLogPoller({
 });
 const simpleModelServerEventLog = new ServiceEventLogPoller({
     source: "SimpleModelServer",
-    isActive: () => usingSimpleModelServerWindowsService,
+    isActive: (): boolean => simpleModelServer.usingWindowsService,
     channel: () => channelSimpleModelServer,
     onError: (message) => log(`SimpleModelServer service log poll failed: ${message}`),
+});
+
+// The SimpleModelServer router process, as seen from VS Code (see simpleModelServerProcess.ts).
+const simpleModelServer: SimpleModelServerProcess = new SimpleModelServerProcess({
+    log: (message) => log(message),
+    output: () => channelSimpleModelServer,
+    serviceEvents: simpleModelServerEventLog,
+    exePath: () => simpleModelServerExePath(),
 });
 
 // The TokenSaver.MCP server, as seen from VS Code (see mcpServerProcess.ts).
@@ -60,17 +67,11 @@ const mcpServer: McpServerProcess = new McpServerProcess({
 // Windows service log polling (TokenSaverMCP)
 
 // SimpleModelServer process
-let simpleModelServerProcess: ReturnType<typeof spawn> | null = null;
-let simpleModelServerStartPromise: Promise<void> | null = null;
-let stoppingSimpleModelServerProcess: Promise<void> | null = null;
-let simpleModelServerHealthCheckInProgress = false;
 
 // Windows service log polling
 
 // Windows service mode — true when SimpleModelServer SCM service is managing the process.
 // In this mode we do not spawn/kill a child process; we use sc.exe to start/stop.
-const SIMPLEMODEL_SERVER_SERVICE_NAME = "SimpleModelServer";
-let usingSimpleModelServerWindowsService = false;
 
 // ─── .tokensaver/config.json behavior config ─────────────────────────────────
 //
@@ -270,25 +271,25 @@ export async function activate(context: vscode.ExtensionContext) {
         channelTokenSaver,
         channelSimpleModelServer,
         vscode.commands.registerCommand("tokenSaver.startServer", async () => {
-            await startSimpleModelServer(context);
+            await simpleModelServer.start();
             await mcpServer.start();
         }),
         vscode.commands.registerCommand("tokenSaver.stopServer", async () => {
             await mcpServer.stop();
-            await stopSimpleModelServer();
+            await simpleModelServer.stop();
             // (context available in closure for potential future use)
         }),
         vscode.commands.registerCommand(
             "tokenSaver.restartServer",
             async () => {
-                await restartServer(context);
+                await restartServer();
             },
         ),
         vscode.commands.registerCommand("tokenSaver.showLogs", () => {
             channelTokenSaver.show(true);
         }),
         vscode.commands.registerCommand("tokenSaver.showStatus", async () => {
-            await startSimpleModelServer(context);
+            await simpleModelServer.start();
             await mcpServer.start();
             showStatusInLog();
         }),
@@ -365,7 +366,7 @@ export async function activate(context: vscode.ExtensionContext) {
         ),
         vscode.workspace.onDidChangeConfiguration(async (e) => {
             if (e.affectsConfiguration("tokenSaver")) {
-                await restartServer(context);
+                await restartServer();
             }
         }),
     );
@@ -387,7 +388,7 @@ export async function activate(context: vscode.ExtensionContext) {
         .getConfiguration("tokenSaver")
         .get<boolean>("autostart", true);
     if (autostart) {
-        await startSimpleModelServer(context);
+        await simpleModelServer.start();
         await mcpServer.start();
         await checkMcpHealth();
         // Full /health self-test (fault-tracking + self-test checks), not just /mcp
@@ -783,7 +784,7 @@ async function checkMcpFullHealth(): Promise<boolean> {
 export function deactivate() {
     // Synchronous kills for the process.exit path — async stop won't run in time
     mcpServer.killChild();
-    simpleModelServerProcess?.kill();
+    simpleModelServer.killChild();
 }
 
 // Ensure child processes are killed even if the extension host is terminated
@@ -795,7 +796,7 @@ process.on("exit", () => {
         // Already exited or never started; nothing to clean up.
     }
     try {
-        simpleModelServerProcess?.kill();
+        simpleModelServer.killChild();
     } catch {
         // Already exited or never started; nothing to clean up.
     }
@@ -807,7 +808,7 @@ process.on("SIGTERM", () => {
         // Already exited or never started; nothing to clean up.
     }
     try {
-        simpleModelServerProcess?.kill();
+        simpleModelServer.killChild();
     } catch {
         // Already exited or never started; nothing to clean up.
     }
@@ -820,7 +821,7 @@ process.on("SIGINT", () => {
         // Already exited or never started; nothing to clean up.
     }
     try {
-        simpleModelServerProcess?.kill();
+        simpleModelServer.killChild();
     } catch {
         // Already exited or never started; nothing to clean up.
     }
@@ -859,183 +860,8 @@ function simpleModelServerMsiPath(context: vscode.ExtensionContext): string {
     );
 }
 
-async function startSimpleModelServer(context: vscode.ExtensionContext) {
-    // ── Service mode ────────────────────────────────────────────────────────
-    const cfg0 = vscode.workspace.getConfiguration("tokenSaver");
-    const healthUrl0 = cfg0.get<string>("simpleModelServer.healthUrl", "http://localhost:11435/health");
-    const port0 = parseInt(new URL(healthUrl0).port, 10);
 
-    if (await isServiceInstalled(SIMPLEMODEL_SERVER_SERVICE_NAME)) {
-        usingSimpleModelServerWindowsService = true;
-        log("SimpleModelServer Windows service detected.");
-        if (!(await isPortOpen("127.0.0.1", port0))) {
-            log("Starting SimpleModelServer service...");
-            await runSc(["start", SIMPLEMODEL_SERVER_SERVICE_NAME]);
-        }
-        const timeoutSec0 = cfg0.get<number>("simpleModelServer.startTimeout", 120);
-        try { await waitForPortOpen("127.0.0.1", port0, timeoutSec0); }
-        catch { log("SimpleModelServer service did not become reachable in time."); }
-        await checkAndHealSimpleModelServer(healthUrl0, context);
-        simpleModelServerEventLog.start();
-        return;
-    }
-    usingSimpleModelServerWindowsService = false;
 
-    // ── Process mode (legacy) ───────────────────────────────────────────────
-    if (simpleModelServerProcess) return;
-    if (simpleModelServerStartPromise) {
-        await simpleModelServerStartPromise;
-        return;
-    }
-    if (stoppingSimpleModelServerProcess) await stoppingSimpleModelServerProcess;
-    if (simpleModelServerProcess) return;
-
-    const cfg = vscode.workspace.getConfiguration("tokenSaver");
-    const healthUrl = cfg.get<string>(
-        "simpleModelServer.healthUrl",
-        "http://localhost:11435/health",
-    );
-    const timeoutSec = cfg.get<number>("simpleModelServer.startTimeout", 120);
-    const exe = simpleModelServerExePath();
-
-    // If something is already listening at the health URL, adopt it
-    const port = new URL(healthUrl).port;
-    if (await isPortOpen("127.0.0.1", parseInt(port, 10))) {
-        log(
-            `SimpleModelServer already running on port ${port} — adopted.`,
-        );
-        await checkAndHealSimpleModelServer(healthUrl, context);
-        return;
-    }
-
-    log(`Launching SimpleModelServer: ${exe}`);
-
-    let proc: ReturnType<typeof spawn>;
-    try {
-        proc = spawn(exe, ["--service"], {
-            stdio: ["ignore", "pipe", "pipe"],
-            windowsHide: true,
-        });
-    } catch (err) {
-        log(
-            `Failed to spawn SimpleModelServer: ${(err as Error).message}`,
-        );
-        return;
-    }
-
-    if (!proc.pid) {
-        log("SimpleModelServer failed to obtain a PID.");
-        return;
-    }
-
-    simpleModelServerProcess = proc;
-
-    proc.stdout?.on("data", (chunk: Buffer) => {
-        for (const line of chunk.toString().split(/\r?\n/).filter(Boolean))
-            channelSimpleModelServer.appendLine(line);
-    });
-    proc.stderr?.on("data", (chunk: Buffer) =>
-        channelSimpleModelServer.append(chunk.toString()),
-    );
-    proc.on("exit", (code, signal) => {
-        simpleModelServerProcess = null;
-        if (code !== 0 && signal == null)
-            log(
-                `SimpleModelServer exited with code=${code} signal=${signal}`,
-            );
-    });
-    proc.on("error", (err) => {
-        simpleModelServerProcess = null;
-        log(`SimpleModelServer error: ${err.message}`);
-    });
-
-    simpleModelServerStartPromise = (async () => {
-        try {
-            await waitForPortOpen("127.0.0.1", parseInt(port, 10), timeoutSec);
-            log("SimpleModelServer is reachable.");
-            await checkAndHealSimpleModelServer(healthUrl, context);
-        } catch (err) {
-            log(
-                `SimpleModelServer startup timeout: ${(err as Error).message}`,
-            );
-            proc.kill();
-            simpleModelServerProcess = null;
-        } finally {
-            simpleModelServerStartPromise = null;
-        }
-    })();
-
-    await simpleModelServerStartPromise;
-}
-
-async function stopSimpleModelServer() {
-    if (usingSimpleModelServerWindowsService) {
-        log("Stopping SimpleModelServer service...");
-        await runSc(["stop", SIMPLEMODEL_SERVER_SERVICE_NAME]);
-        simpleModelServerEventLog.stop();
-        return;
-    }
-    if (!simpleModelServerProcess) {
-        if (stoppingSimpleModelServerProcess) await stoppingSimpleModelServerProcess;
-        return;
-    }
-    if (stoppingSimpleModelServerProcess) {
-        await stoppingSimpleModelServerProcess;
-        return;
-    }
-
-    const proc = simpleModelServerProcess;
-    simpleModelServerProcess = null;
-    let resolved = false;
-
-    stoppingSimpleModelServerProcess = new Promise<void>((resolve) => {
-        const cleanup = () => {
-            if (!resolved) {
-                resolved = true;
-                stoppingSimpleModelServerProcess = null;
-                resolve();
-            }
-        };
-        proc.once("exit", cleanup);
-        proc.once("error", cleanup);
-        proc.once("close", cleanup);
-        proc.kill();
-        setTimeout(() => {
-            if (!proc.killed) proc.kill("SIGKILL");
-            cleanup();
-        }, 3000);
-    });
-
-    await stoppingSimpleModelServerProcess;
-}
-
-/**
- * Hits /health, and if the response is not 200 "ok", kills and restarts
- * SimpleModelServer. Called on initial start and after any slow MCP response.
- */
-export async function checkAndHealSimpleModelServer(
-    healthUrl: string,
-    context: vscode.ExtensionContext,
-): Promise<void> {
-    if (simpleModelServerHealthCheckInProgress) return;
-    simpleModelServerHealthCheckInProgress = true;
-
-    try {
-        const healthy = await fetchHealthOk(healthUrl);
-        if (healthy) {
-            log("SimpleModelServer health: ok");
-            return;
-        }
-
-        log("SimpleModelServer health check failed — restarting...");
-        await stopSimpleModelServer();
-        await startSimpleModelServer(context);
-    } catch (err) {
-        log(`Health check error: ${(err as Error).message}`);
-    } finally {
-        simpleModelServerHealthCheckInProgress = false;
-    }
-}
 
 
 function timestampPrefix(): string {
@@ -1108,11 +934,11 @@ function mcpExePath(): string {
 
 
 
-async function restartServer(context: vscode.ExtensionContext) {
+async function restartServer() {
     updateStatus("restarting");
     await mcpServer.stop();
-    await stopSimpleModelServer();
-    await startSimpleModelServer(context);
+    await simpleModelServer.stop();
+    await simpleModelServer.start();
     await mcpServer.start();
 }
 
@@ -1151,7 +977,7 @@ function registerMcpProvider(context: vscode.ExtensionContext) {
         ) {
             const provider: vscode.McpServerDefinitionProvider = {
                 async provideMcpServerDefinitions() {
-                    await startSimpleModelServer(context);
+                    await simpleModelServer.start();
                     await mcpServer.start();
                     const port =
                         mcpServer.port ??
@@ -1170,7 +996,7 @@ function registerMcpProvider(context: vscode.ExtensionContext) {
                 async resolveMcpServerDefinition(
                     server,
                 ) {
-                    await startSimpleModelServer(context);
+                    await simpleModelServer.start();
                     await mcpServer.start();
                     return server;
                 },
@@ -1211,7 +1037,7 @@ export async function withSlowResponseWatch<T>(
         return await fn();
     } finally {
         if (Date.now() - start >= SLOW_RESPONSE_THRESHOLD_MS) {
-            void checkAndHealSimpleModelServer(healthUrl, context);
+            void simpleModelServer.checkAndHeal(healthUrl);
         }
     }
 }
@@ -1272,9 +1098,9 @@ function showStatusInLog() {
             : `MCP server process running: ${mcpServer.hasChildProcess}`,
     );
     channelTokenSaver.appendLine(
-        usingSimpleModelServerWindowsService
+        simpleModelServer.usingWindowsService
             ? "SimpleModelServer: running as Windows service (SimpleModelServer)"
-            : `SimpleModelServer process running: ${simpleModelServerProcess !== null}`,
+            : `SimpleModelServer process running: ${simpleModelServer.hasChildProcess}`,
     );
     channelTokenSaver.appendLine(
         `SimpleModelServer health URL: ${cfg.get<string>("simpleModelServer.healthUrl", "http://localhost:11435/health")}`,
@@ -1367,7 +1193,7 @@ async function installSimpleModelServerService(context: vscode.ExtensionContext)
         return;
     }
 
-    usingSimpleModelServerWindowsService = true;
+    simpleModelServer.usingWindowsService = true;
     log("SimpleModelServer service installed and started.");
     vscode.window.showInformationMessage(
         "SimpleModelServer installed as Windows service and started. It will now start automatically at login.",
@@ -1423,7 +1249,7 @@ async function uninstallSimpleModelServerService(context?: vscode.ExtensionConte
         }
     }
 
-    usingSimpleModelServerWindowsService = false;
+    simpleModelServer.usingWindowsService = false;
     log("SimpleModelServer service uninstalled.");
     vscode.window.showInformationMessage(
         "SimpleModelServer Windows service removed. The extension will manage it as a process instead.",
