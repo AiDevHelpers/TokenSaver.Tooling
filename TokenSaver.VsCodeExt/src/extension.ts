@@ -1,20 +1,14 @@
 import * as vscode from "vscode";
 import { startIdeBridge } from "./ideBridge.js";
-import {
-    addAuthUser,
-    authHeaders,
-    buildUserPickItems,
-    isServerAlive,
-    isValidAccount,
-    listAuthUsers,
-    readAuthToken,
-    removeAuthUser,
-} from "./auth.js";
+import { isValidAccount, readAuthToken } from "./auth.js";
 import * as path from "path";
 import * as fs from "fs";
 import { ServiceEventLogPoller } from "./serviceEventLog.js";
 import { McpServerProcess, TOKENSAVER_SERVICE_NAME } from "./mcpServerProcess.js";
 import { SimpleModelServerProcess, SIMPLEMODEL_SERVER_SERVICE_NAME } from "./simpleModelServerProcess.js";
+import { checkMcpFullHealth as checkMcpFullHealthFlow, checkMcpHealth as checkMcpHealthFlow, verifyMcpServer as verifyMcpServerFn, type McpHealthDeps } from "./mcpHealth.js";
+import { applyStatusBar, shouldNotify, statusReportLines, timestampPrefix, type ServerStatusState } from "./statusUi.js";
+import { manageUsers as manageUsersFlow, type UserManagementDeps, type UserPick } from "./userManagement.js";
 import { simpleModelServerMsiPath as simpleModelServerMsiPathFor, tokenSaverMsiPath as tokenSaverMsiPathFor } from "./installPaths.js";
 import {
     SERVICE_INSTALL_PROMPT_ASKED_KEY,
@@ -427,153 +421,10 @@ async function currentAuthToken(): Promise<string | undefined> {
     return readAuthToken(cfg.get<string>("auth.tokenPath", ""));
 }
 
-/** Quick pick over the TokenSaver user group: select a member to remove it, a local account to add it. */
-async function manageUsers(): Promise<void> {
-    const cfg = vscode.workspace.getConfiguration("tokenSaver");
-    const port = mcpServer.port ?? cfg.get<number>("server.port", 11436);
-    const token = await currentAuthToken();
-    if (!token) {
-        void vscode.window.showWarningMessage(
-            "TokenSaver: no readable auth token, so users cannot be managed from this account.",
-        );
-        return;
-    }
 
-    try {
-        const info = await listAuthUsers(port, token);
-        const items = buildUserPickItems(info);
-        const picked = await vscode.window.showQuickPick(
-            [
-                ...items,
-                { label: "$(add) Enter another account…", description: "DOMAIN\\name", account: "", action: "add" as const },
-            ],
-            { title: `TokenSaver users (group: ${info.group})`, placeHolder: "Select a member to remove or an account to add" },
-        );
-        if (!picked) {
-            return;
-        }
 
-        let account = picked.account;
-        if (account === "") {
-            const typed = await vscode.window.showInputBox({
-                prompt: "Account to add (DOMAIN\\name or name)",
-                validateInput: (v) => (isValidAccount(v) ? undefined : "Not a valid account name"),
-            });
-            if (!typed) {
-                return;
-            }
 
-            account = typed;
-        }
 
-        if (picked.action === "remove") {
-            await removeAuthUser(port, token, account);
-            void vscode.window.showInformationMessage(`TokenSaver: removed ${account}.`);
-        } else {
-            await addAuthUser(port, token, account);
-            void vscode.window.showInformationMessage(`TokenSaver: added ${account}.`);
-        }
-    } catch (err) {
-        void vscode.window.showErrorMessage(`TokenSaver: ${(err as Error).message}`);
-    }
-}
-
-/** Hits the MCP /mcp endpoint after startup. If unreachable, restarts the MCP server. */
-async function checkMcpHealth(): Promise<boolean> {
-    const cfg = vscode.workspace.getConfiguration("tokenSaver");
-    const port = mcpServer.port ?? cfg.get<number>("server.port", 11436);
-    // Use 127.0.0.1 instead of localhost to avoid IPv6 resolution on Windows.
-    const url = `http://127.0.0.1:${port}/mcp`;
-
-    try {
-        const res = await fetch(url, {
-            headers: authHeaders(await currentAuthToken()),
-            signal: AbortSignal.timeout(5000),
-        });
-        // 401 means the server is up but did not accept (or we could not read) the token: not a reason to restart.
-        if (isServerAlive(res.status)) {
-            log("MCP server health: ok");
-            return true;
-        }
-        log(`MCP server health check returned ${res.status} — restarting...`);
-    } catch {
-        log("MCP server unreachable after start — restarting...");
-    }
-
-    await mcpServer.stop();
-    try {
-        await mcpServer.start();
-        return true;
-    } catch {
-        return false;
-    }
-}
-
-/** Shape of TokenSaver.MCP's /health JSON response — see docs/tokensaver-mcp-health-contract.md. */
-interface McpHealthCheckEntry {
-    name?: string;
-    status?: string;
-    description?: string;
-    error?: string | null;
-}
-
-interface McpHealthReport {
-    status?: string;
-    checks?: McpHealthCheckEntry[];
-}
-
-/**
- * Hits TokenSaver.MCP's own /health endpoint (not just /mcp reachability, which checkMcpHealth
- * above already covers) so the fault-tracking and self-test checks built into that endpoint —
- * see docs/tokensaver-mcp-health-contract.md — actually get consulted on startup instead of
- * only ever running when something else happens to poll /health manually. Unlike checkMcpHealth,
- * this never restarts the server: /health can legitimately report Degraded (models not
- * warmed up yet, self-test wiring hiccup, etc.) without the process itself being broken, so this
- * only logs and notifies — restarting on every Degraded would fight the same "restart-flapping"
- * problem checkAndHealSimpleModelServer's health-based restart deliberately avoids for the SimpleModelServer
- * side by tolerating 503/degraded there too. Returns true if the endpoint was reachable at all
- * (regardless of status), false only if it couldn't be reached/parsed.
- */
-async function checkMcpFullHealth(): Promise<boolean> {
-    const cfg = vscode.workspace.getConfiguration("tokenSaver");
-    const port = mcpServer.port ?? cfg.get<number>("server.port", 11436);
-    const url = `http://127.0.0.1:${port}/health`;
-
-    let report: McpHealthReport;
-    try {
-        const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
-        report = (await res.json()) as McpHealthReport;
-    } catch (err) {
-        log(`TokenSaver.MCP full self-test (/health) unreachable: ${(err as Error).message}`);
-        return false;
-    }
-
-    const status = report.status ?? "Unknown";
-    log(`TokenSaver.MCP full self-test (/health): ${status}`);
-
-    const failingChecks = (report.checks ?? []).filter(
-        (c) => c.status && c.status !== "Healthy",
-    );
-    if (failingChecks.length === 0) {
-        return true;
-    }
-
-    for (const check of failingChecks) {
-        const detail = check.error ?? check.description ?? "(no detail)";
-        log(`  ${check.name ?? "(unnamed check)"}: ${check.status} — ${detail}`);
-    }
-
-    if (status !== "Healthy") {
-        notify(
-            "error",
-            `TokenSaver.MCP self-test reported ${status}: ${failingChecks
-                .map((c) => c.name ?? "check")
-                .join(", ")}. See TokenSaver output for details.`,
-        );
-    }
-
-    return true;
-}
 
 export function deactivate() {
     // Synchronous kills for the process.exit path — async stop won't run in time
@@ -643,15 +494,6 @@ function simpleModelServerExePath(): string {
 
 
 
-function timestampPrefix(): string {
-    // Matches the yyyy-MM-dd HH:mm:ss convention already used by SimpleModelServer/TokenSaver.MCP's
-    // own console/EventLog logging (see Program.cs in both projects), so lifecycle lines in the
-    // output channel line up with the service's own log lines instead of showing no timestamp at
-    // all (as plain appendLine did before) or a raw epoch/wire-format value.
-    const now = new Date();
-    const pad = (n: number, len = 2) => String(n).padStart(len, "0");
-    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-}
 
 
 
@@ -763,6 +605,90 @@ async function ensureInstalled(context: vscode.ExtensionContext): Promise<void> 
     await ensureInstalledFlow(context, setupDeps);
 }
 
+// ─── Health, users and status (the logic lives in mcpHealth.ts, userManagement.ts and statusUi.ts) ─
+
+function mcpPort(): number {
+    return mcpServer.port ?? vscode.workspace.getConfiguration("tokenSaver").get<number>("server.port", 11436);
+}
+
+function mcpHealthDeps(): McpHealthDeps {
+    return {
+        log: (message) => log(message),
+        notify: (type, message) => notify(type, message),
+        port: () => mcpPort(),
+        token: () => currentAuthToken(),
+        stop: () => mcpServer.stop(),
+        start: () => mcpServer.start(),
+    };
+}
+
+function checkMcpHealth(): Promise<boolean> {
+    return checkMcpHealthFlow(mcpHealthDeps());
+}
+
+function checkMcpFullHealth(): Promise<boolean> {
+    return checkMcpFullHealthFlow({
+        log: (message) => log(message),
+        notify: (type, message) => notify(type, message),
+        port: () => mcpPort(),
+    });
+}
+
+async function verifyMcpServer(port: number, timeoutMs = 5000): Promise<boolean> {
+    return verifyMcpServerFn(port, await currentAuthToken(), timeoutMs);
+}
+
+function manageUsers(): Promise<void> {
+    return manageUsersFlow({
+        port: () => mcpPort(),
+        token: () => currentAuthToken(),
+        warn: (message) => void vscode.window.showWarningMessage(message),
+        info: (message) => void vscode.window.showInformationMessage(message),
+        error: (message) => void vscode.window.showErrorMessage(message),
+        pick: async (items, title) =>
+            vscode.window.showQuickPick(items as UserPick[], {
+                title,
+                placeHolder: "Select a member to remove or an account to add",
+            }),
+        input: async () =>
+            vscode.window.showInputBox({
+                prompt: "Account to add (DOMAIN\\name or name)",
+                validateInput: (v) => (isValidAccount(v) ? undefined : "Not a valid account name"),
+            }),
+    } satisfies UserManagementDeps);
+}
+
+function updateStatus(state: ServerStatusState): void {
+    const autoOn = vscode.workspace.getConfiguration("tokenSaver").get<boolean>("autoCodeHelper.enabled", false);
+    applyStatusBar(statusBar, state, autoOn);
+}
+
+function showStatusInLog(): void {
+    const cfg = vscode.workspace.getConfiguration("tokenSaver");
+    channelTokenSaver.show(true);
+    for (const line of statusReportLines({
+        configuredPort: cfg.get<number>("server.port", 11436),
+        actualPort: mcpServer.port,
+        mcpWindowsService: mcpServer.usingWindowsService,
+        mcpChildRunning: mcpServer.hasChildProcess,
+        simpleModelServerWindowsService: simpleModelServer.usingWindowsService,
+        simpleModelServerChildRunning: simpleModelServer.hasChildProcess,
+        simpleModelServerHealthUrl: cfg.get<string>("simpleModelServer.healthUrl", "http://localhost:11435/health"),
+    })) {
+        channelTokenSaver.appendLine(line);
+    }
+}
+
+function notify(type: "info" | "error", message: string): void {
+    const cfg = vscode.workspace.getConfiguration("tokenSaver.notifications");
+    if (!shouldNotify(type, cfg.get<boolean>("enabled", true), cfg.get<string>("level", "all"))) return;
+    if (type === "error") {
+        vscode.window.showErrorMessage(message);
+    } else {
+        vscode.window.showInformationMessage(message);
+    }
+}
+
 // ─── Manual install prompt (VS Code Copilot, Claude Code, Cursor, Sixth, Continue) ──────────
 
 /**
@@ -865,82 +791,10 @@ export async function withSlowResponseWatch<T>(
 
 // ─── status bar ──────────────────────────────────────────────────────────────
 
-function updateStatus(
-    state: "running" | "stopped" | "starting" | "restarting" | "error",
-) {
-    switch (state) {
-        case "running": {
-            const autoOn = vscode.workspace
-                .getConfiguration("tokenSaver")
-                .get<boolean>("autoCodeHelper.enabled", false);
-            statusBar.text = autoOn
-                ? "$(server) TokenSaver: Running $(rocket)"
-                : "$(server) TokenSaver: Running";
-            statusBar.tooltip = autoOn
-                ? "TokenSaver running with CodeHelper auto-workflow active. Click for status."
-                : "TokenSaver MCP server is running. Click for status.";
-            break;
-        }
-        case "stopped":
-            statusBar.text = "$(server) TokenSaver: Stopped";
-            statusBar.tooltip =
-                "TokenSaver MCP server is stopped. Click to start.";
-            break;
-        case "starting":
-            statusBar.text = "$(sync~spin) TokenSaver: Starting…";
-            statusBar.tooltip = "TokenSaver MCP server is starting.";
-            break;
-        case "restarting":
-            statusBar.text = "$(sync~spin) TokenSaver: Restarting…";
-            statusBar.tooltip = "TokenSaver MCP server is restarting.";
-            break;
-        case "error":
-            statusBar.text = "$(issue-opened) TokenSaver: Error";
-            statusBar.tooltip =
-                "TokenSaver MCP server encountered an error. Click for logs.";
-            break;
-    }
-    statusBar.show();
-}
 
-function showStatusInLog() {
-    const cfg = vscode.workspace.getConfiguration("tokenSaver");
-    channelTokenSaver.show(true);
-    channelTokenSaver.appendLine("=== TokenSaver Status ===");
-    channelTokenSaver.appendLine(
-        `MCP server port (configured): ${cfg.get<number>("server.port", 11436)}`,
-    );
-    channelTokenSaver.appendLine(
-        `MCP server actual port: ${mcpServer.port ?? "(not running)"}`,
-    );
-    channelTokenSaver.appendLine(
-        mcpServer.usingWindowsService
-            ? "MCP server: running as Windows service (TokenSaverMCP)"
-            : `MCP server process running: ${mcpServer.hasChildProcess}`,
-    );
-    channelTokenSaver.appendLine(
-        simpleModelServer.usingWindowsService
-            ? "SimpleModelServer: running as Windows service (SimpleModelServer)"
-            : `SimpleModelServer process running: ${simpleModelServer.hasChildProcess}`,
-    );
-    channelTokenSaver.appendLine(
-        `SimpleModelServer health URL: ${cfg.get<string>("simpleModelServer.healthUrl", "http://localhost:11435/health")}`,
-    );
-    channelTokenSaver.appendLine("==========================");
-}
 
 // ─── notifications ───────────────────────────────────────────────────────────
 
-function notify(type: "info" | "error", message: string) {
-    const cfg = vscode.workspace.getConfiguration("tokenSaver.notifications");
-    if (!cfg.get<boolean>("enabled", true)) return;
-    if (cfg.get<string>("level", "all") === "errors" && type === "info") return;
-    if (type === "error") {
-        vscode.window.showErrorMessage(message);
-    } else {
-        vscode.window.showInformationMessage(message);
-    }
-}
 
 function log(message: string) {
     channelTokenSaver?.appendLine(`${timestampPrefix()} ${message}`);
@@ -954,22 +808,6 @@ function log(message: string) {
 
 
 
-async function verifyMcpServer(
-    port: number,
-    timeoutMs = 5000,
-): Promise<boolean> {
-    try {
-        // Use 127.0.0.1 instead of localhost to avoid Node.js resolving to ::1
-        // (IPv6) when the server only listens on 0.0.0.0 (IPv4).
-        const res = await fetch(
-            `http://127.0.0.1:${port}/mcp`,
-            { headers: authHeaders(await currentAuthToken()), signal: AbortSignal.timeout(timeoutMs) },
-        );
-        return isServerAlive(res.status);
-    } catch {
-        return false;
-    }
-}
 
 
 // ── Windows Service helpers ───────────────────────────────────────────────────
