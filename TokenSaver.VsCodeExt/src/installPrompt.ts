@@ -34,7 +34,7 @@ export function registerMcpProvider(context: vscode.ExtensionContext, deps: McpP
                     return [
                         new vscode.McpHttpServerDefinition(
                             "TokenSaver",
-                            vscode.Uri.parse(`http://localhost:${deps.port()}`),
+                            vscode.Uri.parse(`http://localhost:${deps.port()}/mcp`),
                             {},
                             "1.0.0",
                         ),
