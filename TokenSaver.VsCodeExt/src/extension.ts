@@ -13,6 +13,7 @@ import {
 import { spawn } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
+import { ServiceEventLogPoller } from "./serviceEventLog.js";
 import { isPortOpen, waitForPortOpen, findOpenPortInRange } from "./net.js";
 import { fetchHealthOk, waitForHealthOk } from "./health.js";
 import { isServiceInstalled, runSc, runMsiexec } from "./windowsServices.js";
@@ -31,6 +32,20 @@ let actualServerPort: number | null = null;
 let serverStopIntentional = false; // true while stopServer() is in progress
 let stdoutLineBuffer = "";
 
+// Windows event-log mirrors for the two services (see serviceEventLog.ts).
+const tokenSaverEventLog = new ServiceEventLogPoller({
+    source: "TokenSaver",
+    isActive: () => usingTokenSaverWindowsService,
+    channel: () => channelTokenSaver,
+    onError: (message) => log(`TokenSaver service log poll failed: ${message}`),
+});
+const simpleModelServerEventLog = new ServiceEventLogPoller({
+    source: "SimpleModelServer",
+    isActive: () => usingSimpleModelServerWindowsService,
+    channel: () => channelSimpleModelServer,
+    onError: (message) => log(`SimpleModelServer service log poll failed: ${message}`),
+});
+
 // Windows service mode — true when the TokenSaverMCP SCM service (installed by
 // src/Installers/TokenSaver.Setup, running from Program Files\TokenSaver) is managing the
 // process. In this mode we do not spawn/kill a child process or run an idle-shutdown timer;
@@ -40,9 +55,6 @@ const TOKENSAVER_SERVICE_NAME = "TokenSaverMCP";
 let usingTokenSaverWindowsService = false;
 
 // Windows service log polling (TokenSaverMCP)
-let tokenSaverServiceLogPoller: ReturnType<typeof setTimeout> | null = null;
-let lastTokenSaverServiceRecordId = 0;
-const TOKENSAVER_EVENT_LOG_SOURCE = "TokenSaver";
 
 // SimpleModelServer process
 let simpleModelServerProcess: ReturnType<typeof spawn> | null = null;
@@ -51,9 +63,6 @@ let stoppingSimpleModelServerProcess: Promise<void> | null = null;
 let simpleModelServerHealthCheckInProgress = false;
 
 // Windows service log polling
-let simpleModelServerServiceLogPoller: ReturnType<typeof setTimeout> | null = null;
-let lastSimpleModelServerServiceRecordId = 0;
-const SIMPLEMODEL_SERVER_EVENT_LOG_SOURCE = "SimpleModelServer";
 
 // Windows service mode — true when SimpleModelServer SCM service is managing the process.
 // In this mode we do not spawn/kill a child process; we use sc.exe to start/stop.
@@ -369,7 +378,7 @@ export async function activate(context: vscode.ExtensionContext) {
     void maybePromptAddTokenSaverToGitignore();
 
     // Start listening to SimpleModelServer named pipe (independent of autostart)
-    startSimpleModelServerServiceLogPolling();
+    simpleModelServerEventLog.start();
 
     const autostart = vscode.workspace
         .getConfiguration("tokenSaver")
@@ -864,7 +873,7 @@ async function startSimpleModelServer(context: vscode.ExtensionContext) {
         try { await waitForPortOpen("127.0.0.1", port0, timeoutSec0); }
         catch { log("SimpleModelServer service did not become reachable in time."); }
         await checkAndHealSimpleModelServer(healthUrl0, context);
-        startSimpleModelServerServiceLogPolling();
+        simpleModelServerEventLog.start();
         return;
     }
     usingSimpleModelServerWindowsService = false;
@@ -960,7 +969,7 @@ async function stopSimpleModelServer() {
     if (usingSimpleModelServerWindowsService) {
         log("Stopping SimpleModelServer service...");
         await runSc(["stop", SIMPLEMODEL_SERVER_SERVICE_NAME]);
-        stopSimpleModelServerServiceLogPolling();
+        simpleModelServerEventLog.stop();
         return;
     }
     if (!simpleModelServerProcess) {
@@ -1037,183 +1046,11 @@ function timestampPrefix(): string {
 }
 
 
-function startSimpleModelServerServiceLogPolling() {
-    stopSimpleModelServerServiceLogPolling();
-    if (!usingSimpleModelServerWindowsService) return;
 
-    simpleModelServerServiceLogPoller = setInterval(async () => {
-        try {
-            await pollSimpleModelServerServiceEventLog();
-        } catch (err) {
-            log(`SimpleModelServer service log poll failed: ${(err as Error).message}`);
-        }
-    }, 5000);
 
-    void pollSimpleModelServerServiceEventLog();
-}
 
-function stopSimpleModelServerServiceLogPolling() {
-    if (simpleModelServerServiceLogPoller) {
-        clearInterval(simpleModelServerServiceLogPoller);
-        simpleModelServerServiceLogPoller = null;
-    }
-}
 
-async function pollSimpleModelServerServiceEventLog() {
-    if (!usingSimpleModelServerWindowsService) return;
-    const { execFile } = await import("child_process");
-    // TimeCreated must be reformatted to a plain string *before* ConvertTo-Json: PowerShell's
-    // ConvertTo-Json serializes [DateTime] using the legacy "/Date(ms)/" wire format (a holdover
-    // from old ASP.NET JSON conventions), and the TS side below just does
-    // `entry.TimeCreated ?? ""` with no date parsing — so without this, the output channel
-    // shows raw "/Date(1783200119153)/" strings instead of a readable timestamp.
-    const psCommand = `Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='${SIMPLEMODEL_SERVER_EVENT_LOG_SOURCE}'} -MaxEvents 50 | Select-Object @{n='TimeCreated';e={$_.TimeCreated.ToString('yyyy-MM-dd HH:mm:ss')}},RecordId,LevelDisplayName,Message | ConvertTo-Json -Compress`;
 
-    return new Promise<void>((resolve, reject) => {
-        execFile(
-            "powershell.exe",
-            ["-NoProfile", "-NonInteractive", "-Command", psCommand],
-            { windowsHide: true, maxBuffer: 1024 * 1024 },
-            (err, stdout, stderr) => {
-                if (err) {
-                    const stderrText = stderr?.toString() ?? "";
-                    const errMessage = stderrText || err.message;
-                    if (/NoMatchingEventsFound|No matching events found/i.test(errMessage)) {
-                        resolve();
-                        return;
-                    }
-                    reject(new Error(errMessage));
-                    return;
-                }
-                if (!stdout) {
-                    resolve();
-                    return;
-                }
-
-                let entries: Array<{ TimeCreated?: string; RecordId?: number; LevelDisplayName?: string; Message?: string }> = [];
-                try {
-                    const parsed = JSON.parse(stdout);
-                    if (Array.isArray(parsed)) entries = parsed;
-                    else if (parsed) entries = [parsed];
-                } catch (parseErr) {
-                    reject(parseErr);
-                    return;
-                }
-
-                entries
-                    .filter((entry) => typeof entry.RecordId === "number")
-                    .sort((a, b) => (a.RecordId! - b.RecordId!))
-                    .forEach((entry) => {
-                        if (entry.RecordId! <= lastSimpleModelServerServiceRecordId) return;
-                        lastSimpleModelServerServiceRecordId = entry.RecordId!;
-                        const timestamp = entry.TimeCreated ?? "";
-                        const level = entry.LevelDisplayName ?? "INFO";
-                        const message = entry.Message ?? "";
-                        // Stamp only the first line with timestamp+level; indent continuation
-                        // lines (stack traces, multi-line health check details, etc.) instead of
-                        // repeating the same timestamp on every line — previously every line of
-                        // a stack trace showed the identical stamp, which read as if 20+ log
-                        // events fired in the same instant.
-                        let first = true;
-                        for (const line of message.split(/\r?\n/)) {
-                            if (!line) continue;
-                            channelSimpleModelServer?.appendLine(first ? `${timestamp} ${level} ${line}` : `    ${line}`);
-                            first = false;
-                        }
-                    });
-
-                resolve();
-            },
-        );
-    });
-}
-
-function startTokenSaverServiceLogPolling() {
-    stopTokenSaverServiceLogPolling();
-    if (!usingTokenSaverWindowsService) return;
-
-    tokenSaverServiceLogPoller = setInterval(async () => {
-        try {
-            await pollTokenSaverServiceEventLog();
-        } catch (err) {
-            log(`TokenSaver service log poll failed: ${(err as Error).message}`);
-        }
-    }, 5000);
-
-    void pollTokenSaverServiceEventLog();
-}
-
-function stopTokenSaverServiceLogPolling() {
-    if (tokenSaverServiceLogPoller) {
-        clearInterval(tokenSaverServiceLogPoller);
-        tokenSaverServiceLogPoller = null;
-    }
-}
-
-async function pollTokenSaverServiceEventLog() {
-    if (!usingTokenSaverWindowsService) return;
-    const { execFile } = await import("child_process");
-    // See the matching comment in pollSimpleModelServerServiceEventLog for why TimeCreated is
-    // reformatted here rather than left as a raw [DateTime] — ConvertTo-Json would otherwise
-    // emit the legacy "/Date(ms)/" wire format instead of a readable timestamp.
-    const psCommand = `Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='${TOKENSAVER_EVENT_LOG_SOURCE}'} -MaxEvents 50 | Select-Object @{n='TimeCreated';e={$_.TimeCreated.ToString('yyyy-MM-dd HH:mm:ss')}},RecordId,LevelDisplayName,Message | ConvertTo-Json -Compress`;
-
-    return new Promise<void>((resolve, reject) => {
-        execFile(
-            "powershell.exe",
-            ["-NoProfile", "-NonInteractive", "-Command", psCommand],
-            { windowsHide: true, maxBuffer: 1024 * 1024 },
-            (err, stdout, stderr) => {
-                if (err) {
-                    const stderrText = stderr?.toString() ?? "";
-                    const errMessage = stderrText || err.message;
-                    if (/NoMatchingEventsFound|No matching events found/i.test(errMessage)) {
-                        resolve();
-                        return;
-                    }
-                    reject(new Error(errMessage));
-                    return;
-                }
-                if (!stdout) {
-                    resolve();
-                    return;
-                }
-
-                let entries: Array<{ TimeCreated?: string; RecordId?: number; LevelDisplayName?: string; Message?: string }> = [];
-                try {
-                    const parsed = JSON.parse(stdout);
-                    if (Array.isArray(parsed)) entries = parsed;
-                    else if (parsed) entries = [parsed];
-                } catch (parseErr) {
-                    reject(parseErr);
-                    return;
-                }
-
-                entries
-                    .filter((entry) => typeof entry.RecordId === "number")
-                    .sort((a, b) => (a.RecordId! - b.RecordId!))
-                    .forEach((entry) => {
-                        if (entry.RecordId! <= lastTokenSaverServiceRecordId) return;
-                        lastTokenSaverServiceRecordId = entry.RecordId!;
-                        const timestamp = entry.TimeCreated ?? "";
-                        const level = entry.LevelDisplayName ?? "INFO";
-                        const message = entry.Message ?? "";
-                        // See the matching comment in pollSimpleModelServerServiceEventLog: stamp only
-                        // the first line, indent continuation lines instead of repeating the
-                        // same timestamp on every line of a stack trace.
-                        let first = true;
-                        for (const line of message.split(/\r?\n/)) {
-                            if (!line) continue;
-                            channelTokenSaver?.appendLine(first ? `${timestamp} ${level} ${line}` : `    ${line}`);
-                            first = false;
-                        }
-                    });
-
-                resolve();
-            },
-        );
-    });
-}
 
 // ─── log routing ─────────────────────────────────────────────────────────────
 
@@ -1336,11 +1173,11 @@ async function startServer() {
             updateStatus("error");
             log(`TokenSaverMCP service is running but /mcp did not respond on port ${port}.`);
         }
-        startTokenSaverServiceLogPolling();
+        tokenSaverEventLog.start();
         return;
     }
     usingTokenSaverWindowsService = false;
-    stopTokenSaverServiceLogPolling();
+    tokenSaverEventLog.stop();
 
     // ── Process mode (legacy: extension spawns and owns the child process) ──
     if (serverProcess) {
@@ -1506,7 +1343,7 @@ async function stopServer() {
     if (usingTokenSaverWindowsService) {
         log("Stopping TokenSaverMCP service...");
         await runSc(["stop", TOKENSAVER_SERVICE_NAME]);
-        stopTokenSaverServiceLogPolling();
+        tokenSaverEventLog.stop();
         updateStatus("stopped");
         return;
     }
