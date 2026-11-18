@@ -5,7 +5,8 @@ import { isPortOpen, waitForPortOpen } from "./net.js";
 import { isServiceInstalled, runSc } from "./windowsServices.js";
 
 /** The Windows service name the SimpleModelServer MSI registers. */
-export const SIMPLEMODEL_SERVER_SERVICE_NAME = "SimpleModelServer";
+import { SIMPLEMODEL_SERVER_SERVICE_NAME } from "./installPaths.js";
+export { SIMPLEMODEL_SERVER_SERVICE_NAME };
 
 /** What the SimpleModelServer lifecycle needs from the extension. Members are called lazily. */
 export interface SimpleModelServerDeps {

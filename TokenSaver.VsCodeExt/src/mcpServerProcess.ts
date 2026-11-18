@@ -5,7 +5,8 @@ import { formatLogLine, listeningPort, splitChunk } from "./stdoutRouting.js";
 import { isServiceInstalled, runSc } from "./windowsServices.js";
 
 /** The Windows service name the MSI registers for TokenSaver.MCP. */
-export const TOKENSAVER_SERVICE_NAME = "TokenSaverMCP";
+import { TOKENSAVER_SERVICE_NAME } from "./installPaths.js";
+export { TOKENSAVER_SERVICE_NAME };
 
 export type ServerState = "running" | "stopped" | "starting" | "restarting" | "error";
 

@@ -15,6 +15,14 @@ import * as fs from "fs";
 import { ServiceEventLogPoller } from "./serviceEventLog.js";
 import { McpServerProcess, TOKENSAVER_SERVICE_NAME } from "./mcpServerProcess.js";
 import { SimpleModelServerProcess, SIMPLEMODEL_SERVER_SERVICE_NAME } from "./simpleModelServerProcess.js";
+import { simpleModelServerMsiPath as simpleModelServerMsiPathFor, tokenSaverMsiPath as tokenSaverMsiPathFor } from "./installPaths.js";
+import {
+    SERVICE_INSTALL_PROMPT_ASKED_KEY,
+    ensureInstalled as ensureInstalledFlow,
+    maybePromptForServiceInstall as maybePromptForServiceInstallFlow,
+    runFullSetup as runFullSetupFlow,
+    type SetupDeps,
+} from "./setupFlow.js";
 import { installWindowsService, uninstallWindowsService, type ServiceInstallerDeps, type WindowsServiceSpec } from "./serviceInstaller.js";
 import { waitForHealthOk } from "./health.js";
 import { isServiceInstalled, runSc, runMsiexec } from "./windowsServices.js";
@@ -403,230 +411,15 @@ export async function activate(context: vscode.ExtensionContext) {
 
 // ─── First-run service install prompt ────────────────────────────────────────
 
-const SERVICE_INSTALL_PROMPT_ASKED_KEY = "tokenSaver.serviceInstallPromptAsked";
 
-/**
- * On first activation (per machine/profile — tracked via globalState, not per-session), if
- * neither the TokenSaverMCP nor SimpleModelServer Windows services are installed and the
- * bundled MSIs are present (see build-vsix.ps1 / bin/*.Setup), asks the user once whether to
- * install them via the same msiexec path the "Install TokenSaver MCP" / "Install SimpleModelServer
- * as Windows Service" commands use (installTokenSaverService / installSimpleModelServerService).
- * Without this, a user has to know those commands exist and run them manually after installing
- * the VSIX — this closes that gap while still asking permission before an admin-elevating
- * msiexec install runs. Respects tokenSaver.autoInstallPrompt (default true) and never asks
- * again once answered, regardless of the answer, so declining doesn't nag on every reload.
- */
-async function maybePromptForServiceInstall(context: vscode.ExtensionContext) {
-    const cfg = vscode.workspace.getConfiguration("tokenSaver");
-    if (!cfg.get<boolean>("autoInstallPrompt", true)) return;
 
-    if (context.globalState.get<boolean>(SERVICE_INSTALL_PROMPT_ASKED_KEY, false)) {
-        return;
-    }
 
-    const mcpMsi = tokenSaverMsiPath(context);
-    const simpleModelServerMsi = simpleModelServerMsiPath(context);
-    const mcpMsiAvailable = fs.existsSync(mcpMsi);
-    const simpleModelServerMsiAvailable = fs.existsSync(simpleModelServerMsi);
-    if (!mcpMsiAvailable && !simpleModelServerMsiAvailable) return; // no bundled installers — nothing to offer
-
-    const [mcpInstalled, simpleModelServerInstalled] = await Promise.all([
-        isServiceInstalled(TOKENSAVER_SERVICE_NAME),
-        isServiceInstalled(SIMPLEMODEL_SERVER_SERVICE_NAME),
-    ]);
-    const needsMcpInstall = mcpMsiAvailable && !mcpInstalled;
-    const needsSimpleModelServerInstall = simpleModelServerMsiAvailable && !simpleModelServerInstalled;
-    if (!needsMcpInstall && !needsSimpleModelServerInstall) {
-        // Already installed (or no bundled MSI for what's missing) — remember we don't need to ask.
-        await context.globalState.update(SERVICE_INSTALL_PROMPT_ASKED_KEY, true);
-        return;
-    }
-
-    // Mark as asked before showing the prompt so a reload/crash mid-dialog can't cause a loop.
-    await context.globalState.update(SERVICE_INSTALL_PROMPT_ASKED_KEY, true);
-
-    const choice = await vscode.window.showInformationMessage(
-        "TokenSaver can install itself and SimpleModelServer as background Windows services (auto-starts at login, no VS Code window required). Install now? A UAC prompt may appear.",
-        "Install",
-        "Not now",
-    );
-    if (choice !== "Install") {
-        log("Service auto-install declined by user.");
-        return;
-    }
-
-    await runFullSetup(context);
-}
-
-/**
- * One-shot end-to-end setup, run automatically after the user confirms the first-run install
- * prompt (see maybePromptForServiceInstall above) and also available manually as the
- * "TokenSaver: Run Full Setup" command for re-running after a partial/failed attempt.
- *
- * Does, in order, only stopping early if a step fails:
- *   1. Install SimpleModelServer service (skipped if already installed).
- *   2. Wait for SimpleModelServer to report healthy on its /health endpoint — this can take
- *      several minutes on first run (model download/warmup), so it uses
- *      tokenSaver.simpleModelServer.startTimeout (default 600s), not the short server-restart-style
- *      timeout used elsewhere.
- *   3. Install TokenSaverMCP service (skipped if already installed).
- *   4. Wait for TokenSaver.MCP to respond on /mcp (tokenSaver.server.startTimeout, default 30s
- *      — this is a fast local process with no model warmup, unlike step 2).
- *   5. Open INSTALL_PROMPT.md so the user/AI can wire up the MCP client.
- *
- * Each step re-checks actual system state (isServiceInstalled/health polling) rather than
- * trusting that a previous call's promise resolving means the step truly succeeded — the same
- * defensive pattern installSimpleModelServerService/installTokenSaverService already use, since a
- * silently-swallowed UI interaction (e.g. a missed click, or msiexec failing after the promise
- * already resolved) must not be allowed to cascade into later steps running against a system
- * that isn't actually ready.
- */
-async function runFullSetup(context: vscode.ExtensionContext): Promise<void> {
-    log("=== TokenSaver full setup starting ===");
-
-    // Step 1: SimpleModelServer service install.
-    if (!(await isServiceInstalled(SIMPLEMODEL_SERVER_SERVICE_NAME))) {
-        await installSimpleModelServerService(context);
-        if (!(await isServiceInstalled(SIMPLEMODEL_SERVER_SERVICE_NAME))) {
-            log("Full setup: SimpleModelServer service is still not installed after install step — aborting.");
-            vscode.window.showErrorMessage(
-                "TokenSaver setup failed: SimpleModelServer did not install. See the SimpleModelServer output channel for details.",
-            );
-            return;
-        }
-    } else {
-        log("Full setup: SimpleModelServer service already installed — skipping install.");
-    }
-
-    // Step 2: wait for SimpleModelServer to actually be healthy, not just "installed".
-    const cfg = vscode.workspace.getConfiguration("tokenSaver");
-    const healthUrl = cfg.get<string>("simpleModelServer.healthUrl", "http://localhost:11435/health");
-    const simpleModelServerTimeoutSec = cfg.get<number>("simpleModelServer.startTimeout", 600);
-    log(`Full setup: waiting up to ${simpleModelServerTimeoutSec}s for SimpleModelServer to report healthy...`);
-    vscode.window.showInformationMessage(
-        "TokenSaver setup: waiting for SimpleModelServer to finish starting (first run can take several minutes while models download/warm up)...",
-    );
-
-    const firstWaitSec = Math.max(30, Math.floor(simpleModelServerTimeoutSec / 3));
-    let simpleModelServerHealthy = await waitForHealthOk(healthUrl, firstWaitSec);
-    if (!simpleModelServerHealthy) {
-        log(
-            `Full setup: SimpleModelServer still not healthy after ${firstWaitSec}s — restarting the service once ` +
-            "and continuing to wait...",
-        );
-        await runSc(["stop", SIMPLEMODEL_SERVER_SERVICE_NAME]);
-        await new Promise((r) => setTimeout(r, 2000));
-        await runSc(["start", SIMPLEMODEL_SERVER_SERVICE_NAME]);
-        simpleModelServerHealthy = await waitForHealthOk(healthUrl, simpleModelServerTimeoutSec - firstWaitSec);
-    }
-    if (!simpleModelServerHealthy) {
-        log(`Full setup: SimpleModelServer did not become healthy within ${simpleModelServerTimeoutSec}s — aborting.`);
-        vscode.window.showErrorMessage(
-            `TokenSaver setup failed: SimpleModelServer did not become healthy within ${simpleModelServerTimeoutSec}s. Check the SimpleModelServer output channel.`,
-        );
-        return;
-    }
-    log("Full setup: SimpleModelServer is healthy.");
-
-    // Step 3: TokenSaver.MCP service install.
-    if (!(await isServiceInstalled(TOKENSAVER_SERVICE_NAME))) {
-        await installTokenSaverService(context);
-        if (!(await isServiceInstalled(TOKENSAVER_SERVICE_NAME))) {
-            log("Full setup: TokenSaverMCP service is still not installed after install step — aborting.");
-            vscode.window.showErrorMessage(
-                "TokenSaver setup failed: TokenSaver.MCP did not install. See the TokenSaver output channel for details.",
-            );
-            return;
-        }
-    } else {
-        log("Full setup: TokenSaverMCP service already installed — skipping install.");
-    }
-
-    // Step 4: wait for TokenSaver.MCP to actually respond, not just "installed".
-    const port = cfg.get<number>("server.port", 11436);
-    const mcpTimeoutSec = cfg.get<number>("server.startTimeout", 30);
-    log(`Full setup: waiting up to ${mcpTimeoutSec}s for TokenSaver.MCP to become reachable...`);
-    const mcpHealthy = await waitForMcpReachable(port, mcpTimeoutSec);
-    if (!mcpHealthy) {
-        log(`Full setup: TokenSaver.MCP did not become reachable within ${mcpTimeoutSec}s — aborting.`);
-        vscode.window.showErrorMessage(
-            `TokenSaver setup failed: TokenSaver.MCP did not respond on port ${port} within ${mcpTimeoutSec}s. Check the TokenSaver output channel.`,
-        );
-        return;
-    }
-    log("Full setup: TokenSaver.MCP is reachable.");
-
-    // Now that it's reachable, also run the full /health self-test (fault-tracking + self-test
-    // checks — see docs/tokensaver-mcp-health-contract.md) so a fresh install's config/wiring
-    // problems surface here rather than silently waiting to be discovered by the first real
-    // MCP tool call. Doesn't block/abort setup on a Degraded result — see checkMcpFullHealth's
-    // doc comment — but does log and notify so the user sees it immediately.
-    await checkMcpFullHealth();
-
-    // Step 5: open the AI install instructions now that both services are confirmed healthy.
-    await openInstallPrompt(context);
-    log("=== TokenSaver full setup complete ===");
-    vscode.window.showInformationMessage(
-        "TokenSaver setup complete: SimpleModelServer and TokenSaver.MCP are both installed and running.",
-    );
-}
-
-/** Polls a /health-style endpoint until it reports ok/degraded or the timeout elapses. */
-
-/** Polls the TokenSaver /mcp endpoint until it responds or the timeout elapses. */
-async function waitForMcpReachable(port: number, timeoutSec: number): Promise<boolean> {
-    const deadline = Date.now() + timeoutSec * 1000;
-    while (Date.now() < deadline) {
-        if (await verifyMcpServer(port)) return true;
-        await new Promise((r) => setTimeout(r, 1000));
-    }
-    return false;
-}
 
 // NOTE: TokenSaver used to auto-write .vscode/mcp.json (ensureMcpJson) so Copilot Chat
 // would pick up the server without the user doing anything. Removed along with the other
 // provider auto-install paths — see the "TokenSaver: Open Install Prompt" command /
 // INSTALL_PROMPT.md for the manual replacement, which covers VS Code Copilot too.
 
-/** Installs the bundled VSIX into VS Code if it exists and hasn't been installed yet.
- *  Runs silently in the background — a failed install is logged but not fatal. */
-async function ensureInstalled(context: vscode.ExtensionContext) {
-    const vsixPath = path.join(context.extensionPath, "tokensaver.vsix");
-    if (!fs.existsSync(vsixPath)) return;
-
-    // Check if already installed at this version
-    const pkg = JSON.parse(
-        fs.readFileSync(
-            path.join(context.extensionPath, "package.json"),
-            "utf8",
-        ),
-    ) as { version?: string };
-    const installedExt = vscode.extensions.getExtension(
-        "local.tokensaver-vscode",
-    );
-    if (installedExt?.packageJSON?.version === pkg.version) return;
-
-    log(`Installing VSIX ${vsixPath}...`);
-    try {
-        const { execFile } = await import("child_process");
-        await new Promise<void>((resolve, reject) => {
-            execFile(
-                "code",
-                ["--install-extension", vsixPath, "--force"],
-                (err) => {
-                    if (err) reject(err);
-                    else resolve();
-                },
-            );
-        });
-        log(
-            "VSIX installed — restart VS Code to activate the updated extension.",
-        );
-        notify("info", "TokenSaver updated — please restart VS Code.");
-    } catch (err) {
-        log(`VSIX install failed: ${(err as Error).message}`);
-    }
-}
 
 /** The endpoint token (tokenSaver.auth.tokenPath, else the default locations), or undefined when unreadable. */
 async function currentAuthToken(): Promise<string | undefined> {
@@ -845,21 +638,6 @@ function simpleModelServerExePath(): string {
     return path.join(programFiles, "SimpleModelServer", "SimpleModelServer.Server.exe");
 }
 
-/**
- * Path to the bundled WiX MSI (see ../SimpleModelServer/build/wix/SimpleModelServer.Setup), copied into
- * <extensionDir>/bin/SimpleModelServer.Setup/SimpleModelServer-Setup.msi by scripts/build-vsix.ps1.
- * Used by installSimpleModelServerService()/uninstallSimpleModelServerService() so those commands invoke the
- * same installer a user would run standalone, rather than duplicating its sc.exe logic — same
- * pattern as tokenSaverMsiPath() below.
- */
-function simpleModelServerMsiPath(context: vscode.ExtensionContext): string {
-    return path.join(
-        context.extensionPath,
-        "bin",
-        "SimpleModelServer.Setup",
-        "SimpleModelServer-Setup.msi",
-    );
-}
 
 
 
@@ -902,20 +680,6 @@ function tokenSaverInstalledExePath(): string {
     return path.join(programFiles, "TokenSaver", "TokenSaver.MCP.exe");
 }
 
-/**
- * Path to the bundled WiX MSI (see src/Installers/TokenSaver.Setup), copied into
- * <extensionDir>/bin/TokenSaver.Setup/TokenSaver-Setup.msi by scripts/build-vsix.ps1.
- * Used by installTokenSaverService()/uninstallTokenSaverService() so those commands invoke
- * the same installer a user would run standalone, rather than duplicating its sc.exe logic.
- */
-function tokenSaverMsiPath(context: vscode.ExtensionContext): string {
-    return path.join(
-        context.extensionPath,
-        "bin",
-        "TokenSaver.Setup",
-        "TokenSaver-Setup.msi",
-    );
-}
 
 function mcpExePath(): string {
     const cfg = vscode.workspace.getConfiguration("tokenSaver");
@@ -941,6 +705,62 @@ async function restartServer() {
     await simpleModelServer.stop();
     await simpleModelServer.start();
     await mcpServer.start();
+}
+
+// ─── Service and setup helpers (the flows live in setupFlow.ts) ───────────────
+
+function tokenSaverMsiPath(context: vscode.ExtensionContext): string {
+    return tokenSaverMsiPathFor(context.extensionPath);
+}
+
+function simpleModelServerMsiPath(context: vscode.ExtensionContext): string {
+    return simpleModelServerMsiPathFor(context.extensionPath);
+}
+
+const setupDeps: SetupDeps = {
+    log: (message) => log(message),
+    notify: (type, message) => notify(type, message),
+    info: (message) => void vscode.window.showInformationMessage(message),
+    error: (message) => void vscode.window.showErrorMessage(message),
+    ask: (message, ...labels) => Promise.resolve(vscode.window.showInformationMessage(message, ...labels)),
+    settings: () => {
+        const cfg = vscode.workspace.getConfiguration("tokenSaver");
+        return {
+            healthUrl: cfg.get<string>("simpleModelServer.healthUrl", "http://localhost:11435/health"),
+            simpleModelServerTimeoutSec: cfg.get<number>("simpleModelServer.startTimeout", 600),
+            port: cfg.get<number>("server.port", 11436),
+            mcpTimeoutSec: cfg.get<number>("server.startTimeout", 30),
+            autoInstallPrompt: cfg.get<boolean>("autoInstallPrompt", true),
+        };
+    },
+    isServiceInstalled: (serviceName) => isServiceInstalled(serviceName),
+    runSc: (args) => runSc(args),
+    waitForHealthOk: (healthUrl, timeoutSec) => waitForHealthOk(healthUrl, timeoutSec),
+    verifyMcp: (port) => verifyMcpServer(port),
+    installSimpleModelServer: (context) => installSimpleModelServerService(context),
+    installTokenSaver: (context) => installTokenSaverService(context),
+    checkMcpFullHealth: () => checkMcpFullHealth(),
+    openInstallPrompt: (context) => openInstallPrompt(context),
+    installedVsixVersion: () =>
+        vscode.extensions.getExtension("local.tokensaver-vscode")?.packageJSON?.version as string | undefined,
+    installVsix: async (vsixPath) => {
+        const { execFile } = await import("child_process");
+        await new Promise<void>((resolve, reject) => {
+            execFile("code", ["--install-extension", vsixPath, "--force"], (err) => (err ? reject(err) : resolve()));
+        });
+    },
+};
+
+async function maybePromptForServiceInstall(context: vscode.ExtensionContext): Promise<void> {
+    await maybePromptForServiceInstallFlow(context, setupDeps);
+}
+
+async function runFullSetup(context: vscode.ExtensionContext): Promise<void> {
+    await runFullSetupFlow(context, setupDeps);
+}
+
+async function ensureInstalled(context: vscode.ExtensionContext): Promise<void> {
+    await ensureInstalledFlow(context, setupDeps);
 }
 
 // ─── Manual install prompt (VS Code Copilot, Claude Code, Cursor, Sixth, Continue) ──────────
