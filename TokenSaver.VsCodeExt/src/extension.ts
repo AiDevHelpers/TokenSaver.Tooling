@@ -15,6 +15,7 @@ import * as fs from "fs";
 import { ServiceEventLogPoller } from "./serviceEventLog.js";
 import { McpServerProcess, TOKENSAVER_SERVICE_NAME } from "./mcpServerProcess.js";
 import { SimpleModelServerProcess, SIMPLEMODEL_SERVER_SERVICE_NAME } from "./simpleModelServerProcess.js";
+import { installWindowsService, uninstallWindowsService, type ServiceInstallerDeps, type WindowsServiceSpec } from "./serviceInstaller.js";
 import { waitForHealthOk } from "./health.js";
 import { isServiceInstalled, runSc, runMsiexec } from "./windowsServices.js";
 
@@ -1157,238 +1158,109 @@ async function verifyMcpServer(
 
 /** Runs sc.exe with the given args, returns exit code. */
 
-/**
- * Installs SimpleModelServer as a Windows service by running the bundled
- * WiX MSI (see simpleModelServerMsiPath / ../SimpleModelServer/build/wix/SimpleModelServer.Setup) via msiexec, instead of
- * reimplementing the sc.exe create/config/failure sequence here — the MSI is the single
- * source of truth for how the service gets registered. Mirrors installTokenSaverService()
- * below. /qn runs the install silently; msiexec still shows its own UAC prompt since
- * installing a service requires admin rights.
- */
+// ─── Service install and uninstall (the flows live in serviceInstaller.ts) ───────────
+
+const SIMPLEMODEL_SERVER_INSTALL: WindowsServiceSpec = {
+    serviceName: SIMPLEMODEL_SERVER_SERVICE_NAME,
+    label: "SimpleModelServer",
+    logName: "SimpleModelServer",
+    alreadyInstalled: "SimpleModelServer service is already installed.",
+    installing: "Installing SimpleModelServer. A UAC prompt may appear.",
+    installed: "SimpleModelServer installed as Windows service and started. It will now start automatically at login.",
+    notInstalled: "SimpleModelServer service is not installed.",
+    uninstalling: "Uninstalling SimpleModelServer. A UAC prompt may appear.",
+    removed: "SimpleModelServer Windows service removed. The extension will manage it as a process instead.",
+};
+
+const TOKENSAVER_INSTALL: WindowsServiceSpec = {
+    serviceName: TOKENSAVER_SERVICE_NAME,
+    label: "TokenSaver",
+    logName: "TokenSaverMCP",
+    alreadyInstalled: "TokenSaverMCP service is already installed.",
+    installing: "Installing TokenSaver MCP. A UAC prompt may appear.",
+    installed: "TokenSaver.MCP installed as Windows service and started. It will now start automatically at login.",
+    notInstalled: "TokenSaverMCP service is not installed.",
+    uninstalling: "Uninstalling TokenSaver MCP. A UAC prompt may appear.",
+    removed: "TokenSaver.MCP Windows service removed. The extension will manage it as a process instead.",
+};
+
+/** The VS Code side of the installers: messages, logging, process flags, and the follow-up steps. */
+function installerDeps(hooks: {
+    onInstalled?: () => void;
+    onUninstalled?: () => void;
+    afterInstall?: () => Promise<void>;
+}): ServiceInstallerDeps {
+    return {
+        log: (message) => log(message),
+        info: (message) => void vscode.window.showInformationMessage(message),
+        error: (message) => void vscode.window.showErrorMessage(message),
+        isInstalled: (serviceName) => isServiceInstalled(serviceName),
+        runMsiexec: (args) => runMsiexec(args),
+        runSc: (args) => runSc(args),
+        onInstalled: hooks.onInstalled ?? (() => {}),
+        onUninstalled: hooks.onUninstalled ?? (() => {}),
+        afterInstall: hooks.afterInstall ?? (async () => {}),
+    };
+}
+
 async function installSimpleModelServerService(context: vscode.ExtensionContext) {
-    if (await isServiceInstalled(SIMPLEMODEL_SERVER_SERVICE_NAME)) {
-        vscode.window.showInformationMessage("SimpleModelServer service is already installed.");
-        return;
-    }
-
-    const msi = simpleModelServerMsiPath(context);
-    if (!fs.existsSync(msi)) {
-        vscode.window.showErrorMessage(
-            `SimpleModelServer installer not found at: ${msi}\nRebuild the VSIX with build\\scripts\\build-vsix.ps1 (requires the wix CLI: dotnet tool install -g wix).`,
-        );
-        return;
-    }
-
-    log(`Running installer: ${msi}`);
-    vscode.window.showInformationMessage(
-        "Installing SimpleModelServer. A UAC prompt may appear.",
-    );
-
-    const code = await runMsiexec(["/i", msi, "/qn", "/norestart"]);
-    if (code !== 0) {
-        log(`Installer exited with code ${code}.`);
-        vscode.window.showErrorMessage(
-            `SimpleModelServer installer failed (msiexec exit code ${code}).`,
-        );
-        return;
-    }
-
-    simpleModelServer.usingWindowsService = true;
-    log("SimpleModelServer service installed and started.");
-    vscode.window.showInformationMessage(
-        "SimpleModelServer installed as Windows service and started. It will now start automatically at login.",
-    );
-
-    // Mirror maybePromptForServiceInstall's chaining: once both services are up (this one just
-    // finished, and TokenSaver.MCP either doesn't ship a bundled MSI or is already installed),
-    // open INSTALL_PROMPT.md automatically so the user isn't left to discover that command
-    // separately after running this one manually from the Command Palette.
-    const mcpMsi = tokenSaverMsiPath(context);
-    const mcpStillNeeded = fs.existsSync(mcpMsi) && !(await isServiceInstalled(TOKENSAVER_SERVICE_NAME));
-    if (!mcpStillNeeded) {
-        await openInstallPrompt(context);
-    }
+    await installWindowsService(SIMPLEMODEL_SERVER_INSTALL, simpleModelServerMsiPath(context), installerDeps({
+        onInstalled: () => {
+            simpleModelServer.usingWindowsService = true;
+        },
+        // Once both services are done, open INSTALL_PROMPT.md so the user isn't left to find it themselves.
+        afterInstall: async () => {
+            const mcpMsi = tokenSaverMsiPath(context);
+            const mcpStillNeeded = fs.existsSync(mcpMsi) && !(await isServiceInstalled(TOKENSAVER_SERVICE_NAME));
+            if (!mcpStillNeeded) {
+                await openInstallPrompt(context);
+            }
+        },
+    }));
 }
 
-/**
- * Stops and removes the SimpleModelServer Windows service by running the bundled WiX MSI's
- * uninstall via msiexec (/x), mirroring uninstallTokenSaverService()'s approach of delegating
- * to the MSI rather than duplicating sc.exe stop/delete logic here.
- */
 async function uninstallSimpleModelServerService(context?: vscode.ExtensionContext) {
-    if (!(await isServiceInstalled(SIMPLEMODEL_SERVER_SERVICE_NAME))) {
-        vscode.window.showInformationMessage("SimpleModelServer service is not installed.");
-        return;
-    }
-
-    const msi = context ? simpleModelServerMsiPath(context) : "";
-    if (!msi || !fs.existsSync(msi)) {
-        // Bundled MSI unavailable (e.g. extension installed without it, or context missing) —
-        // fall back to sc.exe stop/delete so uninstall still works.
-        log("Bundled MSI not found — falling back to sc.exe stop/delete.");
-        await runSc(["stop", SIMPLEMODEL_SERVER_SERVICE_NAME]);
-        const scCode = await runSc(["delete", SIMPLEMODEL_SERVER_SERVICE_NAME]);
-        if (scCode !== 0) {
-            vscode.window.showErrorMessage(
-                `sc.exe delete failed (code ${scCode}). Try running VS Code as Administrator.`,
-            );
-            return;
-        }
-    } else {
-        log(`Running uninstaller: ${msi}`);
-        vscode.window.showInformationMessage(
-            "Uninstalling SimpleModelServer. A UAC prompt may appear.",
-        );
-        const code = await runMsiexec(["/x", msi, "/qn", "/norestart"]);
-        if (code !== 0) {
-            log(`Uninstaller exited with code ${code}.`);
-            vscode.window.showErrorMessage(
-                `SimpleModelServer uninstaller failed (msiexec exit code ${code}).`,
-            );
-            return;
-        }
-    }
-
-    simpleModelServer.usingWindowsService = false;
-    log("SimpleModelServer service uninstalled.");
-    vscode.window.showInformationMessage(
-        "SimpleModelServer Windows service removed. The extension will manage it as a process instead.",
+    await uninstallWindowsService(
+        SIMPLEMODEL_SERVER_INSTALL,
+        context ? simpleModelServerMsiPath(context) : undefined,
+        installerDeps({
+            onUninstalled: () => {
+                simpleModelServer.usingWindowsService = false;
+            },
+        }),
+        context ? async () => { await context.globalState.update(SERVICE_INSTALL_PROMPT_ASKED_KEY, false); } : undefined,
     );
-
-    // Reset the first-run install prompt's "already asked" flag so maybePromptForServiceInstall
-    // offers again next activation. There's no reliable onWillUninstall-style hook for detecting
-    // when the VSIX itself is removed, so this — the user explicitly uninstalling the service via
-    // its Command Palette command — is the closest reliable signal that "ask again" makes sense
-    // (e.g. reinstalling the extension fresh, or deliberately tearing the service down to redo
-    // setup). Only clears if context is available (see the MSI-path fallback above for why this
-    // can be undefined).
-    if (context) {
-        await context.globalState.update(SERVICE_INSTALL_PROMPT_ASKED_KEY, false);
-    }
 }
 
-/**
- * Runs msiexec with the given arguments and waits for it to finish.
- *
- * IMPORTANT: msiexec does NOT show its own UAC prompt when invoked with /qn (quiet, no UI) —
- * /qn suppresses all UI, including the elevation dialog itself. A prior version of this
- * function called execFile("msiexec.exe", ...) directly, on the theory that Windows Installer
- * (a system service invoked via COM/RPC) elevates itself independent of the caller. That
- * theory was wrong in the /qn case: with no UI to show, there's nothing for the user to click
- * "Yes" on, so an unelevated caller just gets error 1925 ("insufficient privileges") for any
- * perMachine MSI — which is exactly what happened here (msiexec exit code 1603, no UAC prompt
- * ever appeared). See TokenSaver.Setup/Product.wxs's Scope="perMachine".
- *
- * Fix: shell out through PowerShell's Start-Process -Verb RunAs, which *does* trigger a real
- * UAC consent dialog regardless of /qn, then wait for it and propagate the MSI's exit code.
- * -Wait blocks until msiexec finishes; -PassThru + $proc.ExitCode gets us the real code (Start-
- * Process alone doesn't forward it to the parent process's own exit code the way execFile
- * expects). If the user declines the UAC prompt, Start-Process throws and we surface that as
- * a distinct failure instead of miscounting it as an MSI-side error.
- */
-
-/**
- * Installs TokenSaver.MCP as a Windows service (TokenSaverMCP) by running the bundled WiX
- * MSI (see tokenSaverMsiPath / src/Installers/TokenSaver.Setup) via msiexec, instead of
- * reimplementing the sc.exe create/config/description/failure sequence here — the MSI is now
- * the single source of truth for how the service gets registered, and this stays in sync
- * with it automatically. /qn runs the install silently (no wizard UI); msiexec still shows
- * its own UAC prompt since installing a service requires admin rights.
- */
 async function installTokenSaverService(context: vscode.ExtensionContext) {
-    if (await isServiceInstalled(TOKENSAVER_SERVICE_NAME)) {
-        vscode.window.showInformationMessage("TokenSaverMCP service is already installed.");
-        return;
-    }
-
-    const msi = tokenSaverMsiPath(context);
-    if (!fs.existsSync(msi)) {
-        vscode.window.showErrorMessage(
-            `TokenSaver installer not found at: ${msi}\nRebuild the VSIX with build\\scripts\\build-vsix.ps1 (requires the wix CLI: dotnet tool install -g wix).`,
-        );
-        return;
-    }
-
-    log(`Running installer: ${msi}`);
-    vscode.window.showInformationMessage(
-        "Installing TokenSaver MCP. A UAC prompt may appear.",
-    );
-
-    const code = await runMsiexec(["/i", msi, "/qn", "/norestart"]);
-    if (code !== 0) {
-        log(`Installer exited with code ${code}.`);
-        vscode.window.showErrorMessage(
-            `TokenSaver installer failed (msiexec exit code ${code}).`,
-        );
-        return;
-    }
-
-    mcpServer.usingWindowsService = true;
-    log("TokenSaverMCP service installed and started.");
-    vscode.window.showInformationMessage(
-        "TokenSaver.MCP installed as Windows service and started. It will now start automatically at login.",
-    );
-
-    // Mirror maybePromptForServiceInstall's chaining: once both services are up (this one just
-    // finished, and SimpleModelServer either doesn't ship a bundled MSI or is already installed), open
-    // INSTALL_PROMPT.md automatically so the user isn't left to discover that command separately
-    // after running this one manually from the Command Palette.
-    const simpleModelServerMsi = simpleModelServerMsiPath(context);
-    const simpleModelServerStillNeeded = fs.existsSync(simpleModelServerMsi) && !(await isServiceInstalled(SIMPLEMODEL_SERVER_SERVICE_NAME));
-    if (!simpleModelServerStillNeeded) {
-        await openInstallPrompt(context);
-    }
+    await installWindowsService(TOKENSAVER_INSTALL, tokenSaverMsiPath(context), installerDeps({
+        onInstalled: () => {
+            mcpServer.usingWindowsService = true;
+        },
+        afterInstall: async () => {
+            const simpleModelServerMsi = simpleModelServerMsiPath(context);
+            const simpleModelServerStillNeeded =
+                fs.existsSync(simpleModelServerMsi) && !(await isServiceInstalled(SIMPLEMODEL_SERVER_SERVICE_NAME));
+            if (!simpleModelServerStillNeeded) {
+                await openInstallPrompt(context);
+            }
+        },
+    }));
 }
 
-/**
- * Stops and removes the TokenSaverMCP Windows service by running the bundled WiX MSI's
- * uninstall via msiexec (/x), mirroring installTokenSaverService's approach of delegating to
- * the MSI rather than duplicating sc.exe stop/delete logic here.
- */
 async function uninstallTokenSaverService(context?: vscode.ExtensionContext) {
-    if (!(await isServiceInstalled(TOKENSAVER_SERVICE_NAME))) {
-        vscode.window.showInformationMessage("TokenSaverMCP service is not installed.");
-        return;
-    }
-
-    const msi = context ? tokenSaverMsiPath(context) : "";
-    if (!msi || !fs.existsSync(msi)) {
-        // Bundled MSI unavailable (e.g. extension installed without it, or context missing) —
-        // fall back to sc.exe stop/delete so uninstall still works.
-        log("Bundled MSI not found — falling back to sc.exe stop/delete.");
-        await runSc(["stop", TOKENSAVER_SERVICE_NAME]);
-        const scCode = await runSc(["delete", TOKENSAVER_SERVICE_NAME]);
-        if (scCode !== 0) {
-            vscode.window.showErrorMessage(
-                `sc.exe delete failed (code ${scCode}). Try running VS Code as Administrator.`,
-            );
-            return;
-        }
-    } else {
-        log(`Running uninstaller: ${msi}`);
-        vscode.window.showInformationMessage(
-            "Uninstalling TokenSaver MCP. A UAC prompt may appear.",
-        );
-        const code = await runMsiexec(["/x", msi, "/qn", "/norestart"]);
-        if (code !== 0) {
-            log(`Uninstaller exited with code ${code}.`);
-            vscode.window.showErrorMessage(
-                `TokenSaver uninstaller failed (msiexec exit code ${code}).`,
-            );
-            return;
-        }
-    }
-
-    mcpServer.usingWindowsService = false;
-    log("TokenSaverMCP service uninstalled.");
-    vscode.window.showInformationMessage(
-        "TokenSaver.MCP Windows service removed. The extension will manage it as a process instead.",
+    await uninstallWindowsService(
+        TOKENSAVER_INSTALL,
+        context ? tokenSaverMsiPath(context) : undefined,
+        installerDeps({
+            onUninstalled: () => {
+                mcpServer.usingWindowsService = false;
+            },
+        }),
+        context ? async () => { await context.globalState.update(SERVICE_INSTALL_PROMPT_ASKED_KEY, false); } : undefined,
     );
-
-    // See the matching comment in uninstallSimpleModelServerService: reset the first-run prompt's
-    // "already asked" flag so maybePromptForServiceInstall offers again next activation, since
-    // there's no reliable hook for "the VSIX was uninstalled" and this is the closest signal.
-    if (context) {
-        await context.globalState.update(SERVICE_INSTALL_PROMPT_ASKED_KEY, false);
-    }
 }
+
+
+
+
