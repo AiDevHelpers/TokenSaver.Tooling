@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 using Microsoft.VisualStudio.Extensibility.UI;
 
-using TokenSaver.Vs.Extension.Bridge;
+using SperryDev.Ide.Bridge;
 using TokenSaver.Vs.Extension.Logging;
 using TokenSaver.Vs.Extension.Services;
 using TokenSaver.Vs.Extension.WindowsService;

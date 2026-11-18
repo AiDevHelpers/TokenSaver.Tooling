@@ -7,6 +7,8 @@ using System.Text.Json;
 using EnvDTE;
 using EnvDTE80;
 
+using SperryDev.Ide.Bridge;
+
 namespace TokenSaver.Vs.Extension.Bridge;
 
 /// <summary>

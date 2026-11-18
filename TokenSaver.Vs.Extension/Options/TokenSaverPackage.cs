@@ -8,6 +8,7 @@ using EnvDTE80;
 
 using Microsoft.VisualStudio.Shell;
 
+using SperryDev.Ide.Bridge;
 using TokenSaver.Vs.Extension.Bridge;
 using TokenSaver.Vs.Extension.Logging;
 
@@ -65,7 +66,7 @@ public sealed class TokenSaverPackage : AsyncPackage, IDisposable
                 return actions.Invoke(action, args);
             },
             () => _solutionPath,
-            logger);
+            new BridgeLogger(logger));
         _bridge.Start();
         BridgeControl.Attach(_bridge, pid, pipeName, () => _solutionPath);
 
