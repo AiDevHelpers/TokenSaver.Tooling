@@ -14,8 +14,8 @@ import { spawn } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
 import { ServiceEventLogPoller } from "./serviceEventLog.js";
-import { formatLogLine, listeningPort, splitChunk } from "./stdoutRouting.js";
-import { isPortOpen, waitForPortOpen, findOpenPortInRange } from "./net.js";
+import { McpServerProcess, TOKENSAVER_SERVICE_NAME } from "./mcpServerProcess.js";
+import { isPortOpen, waitForPortOpen } from "./net.js";
 import { fetchHealthOk, waitForHealthOk } from "./health.js";
 import { isServiceInstalled, runSc, runMsiexec } from "./windowsServices.js";
 
@@ -25,18 +25,11 @@ let statusBar: vscode.StatusBarItem;
 let logsStatusBar: vscode.StatusBarItem;
 
 // TokenSaver.MCP process
-let serverProcess: ReturnType<typeof spawn> | null = null;
-let serverStartPromise: Promise<void> | null = null;
-let stoppingServerProcess: Promise<void> | null = null;
-let idleTimer: ReturnType<typeof setTimeout> | null = null;
-let actualServerPort: number | null = null;
-let serverStopIntentional = false; // true while stopServer() is in progress
-let stdoutLineBuffer = "";
 
 // Windows event-log mirrors for the two services (see serviceEventLog.ts).
-const tokenSaverEventLog = new ServiceEventLogPoller({
+const tokenSaverEventLog: ServiceEventLogPoller = new ServiceEventLogPoller({
     source: "TokenSaver",
-    isActive: () => usingTokenSaverWindowsService,
+    isActive: (): boolean => mcpServer.usingWindowsService,
     channel: () => channelTokenSaver,
     onError: (message) => log(`TokenSaver service log poll failed: ${message}`),
 });
@@ -47,13 +40,22 @@ const simpleModelServerEventLog = new ServiceEventLogPoller({
     onError: (message) => log(`SimpleModelServer service log poll failed: ${message}`),
 });
 
+// The TokenSaver.MCP server, as seen from VS Code (see mcpServerProcess.ts).
+const mcpServer: McpServerProcess = new McpServerProcess({
+    log: (message) => log(message),
+    notify: (type, message) => notify(type, message),
+    updateStatus: (state) => updateStatus(state),
+    output: () => channelTokenSaver,
+    serviceEvents: tokenSaverEventLog,
+    verify: (port) => verifyMcpServer(port),
+    exePath: () => mcpExePath(),
+});
+
 // Windows service mode — true when the TokenSaverMCP SCM service (installed by
 // src/Installers/TokenSaver.Setup, running from Program Files\TokenSaver) is managing the
 // process. In this mode we do not spawn/kill a child process or run an idle-shutdown timer;
 // we use sc.exe to start/stop and adopt whatever is already listening on the configured port.
 // Mirrors the equivalent SimpleModelServer service-mode handling below.
-const TOKENSAVER_SERVICE_NAME = "TokenSaverMCP";
-let usingTokenSaverWindowsService = false;
 
 // Windows service log polling (TokenSaverMCP)
 
@@ -269,10 +271,10 @@ export async function activate(context: vscode.ExtensionContext) {
         channelSimpleModelServer,
         vscode.commands.registerCommand("tokenSaver.startServer", async () => {
             await startSimpleModelServer(context);
-            await startServer();
+            await mcpServer.start();
         }),
         vscode.commands.registerCommand("tokenSaver.stopServer", async () => {
-            await stopServer();
+            await mcpServer.stop();
             await stopSimpleModelServer();
             // (context available in closure for potential future use)
         }),
@@ -287,7 +289,7 @@ export async function activate(context: vscode.ExtensionContext) {
         }),
         vscode.commands.registerCommand("tokenSaver.showStatus", async () => {
             await startSimpleModelServer(context);
-            await startServer();
+            await mcpServer.start();
             showStatusInLog();
         }),
         vscode.commands.registerCommand("tokenSaver.installService", async () => {
@@ -386,7 +388,7 @@ export async function activate(context: vscode.ExtensionContext) {
         .get<boolean>("autostart", true);
     if (autostart) {
         await startSimpleModelServer(context);
-        await startServer();
+        await mcpServer.start();
         await checkMcpHealth();
         // Full /health self-test (fault-tracking + self-test checks), not just /mcp
         // reachability — see checkMcpFullHealth's doc comment for why this doesn't restart
@@ -633,7 +635,7 @@ async function currentAuthToken(): Promise<string | undefined> {
 /** Quick pick over the TokenSaver user group: select a member to remove it, a local account to add it. */
 async function manageUsers(): Promise<void> {
     const cfg = vscode.workspace.getConfiguration("tokenSaver");
-    const port = actualServerPort ?? cfg.get<number>("server.port", 11436);
+    const port = mcpServer.port ?? cfg.get<number>("server.port", 11436);
     const token = await currentAuthToken();
     if (!token) {
         void vscode.window.showWarningMessage(
@@ -684,7 +686,7 @@ async function manageUsers(): Promise<void> {
 /** Hits the MCP /mcp endpoint after startup. If unreachable, restarts the MCP server. */
 async function checkMcpHealth(): Promise<boolean> {
     const cfg = vscode.workspace.getConfiguration("tokenSaver");
-    const port = actualServerPort ?? cfg.get<number>("server.port", 11436);
+    const port = mcpServer.port ?? cfg.get<number>("server.port", 11436);
     // Use 127.0.0.1 instead of localhost to avoid IPv6 resolution on Windows.
     const url = `http://127.0.0.1:${port}/mcp`;
 
@@ -703,9 +705,9 @@ async function checkMcpHealth(): Promise<boolean> {
         log("MCP server unreachable after start — restarting...");
     }
 
-    await stopServer();
+    await mcpServer.stop();
     try {
-        await startServer();
+        await mcpServer.start();
         return true;
     } catch {
         return false;
@@ -739,7 +741,7 @@ interface McpHealthReport {
  */
 async function checkMcpFullHealth(): Promise<boolean> {
     const cfg = vscode.workspace.getConfiguration("tokenSaver");
-    const port = actualServerPort ?? cfg.get<number>("server.port", 11436);
+    const port = mcpServer.port ?? cfg.get<number>("server.port", 11436);
     const url = `http://127.0.0.1:${port}/health`;
 
     let report: McpHealthReport;
@@ -780,7 +782,7 @@ async function checkMcpFullHealth(): Promise<boolean> {
 
 export function deactivate() {
     // Synchronous kills for the process.exit path — async stop won't run in time
-    serverProcess?.kill();
+    mcpServer.killChild();
     simpleModelServerProcess?.kill();
 }
 
@@ -788,7 +790,7 @@ export function deactivate() {
 // without calling deactivate (e.g. VS Code reload, crash, SIGTERM)
 process.on("exit", () => {
     try {
-        serverProcess?.kill();
+        mcpServer.killChild();
     } catch {
         // Already exited or never started; nothing to clean up.
     }
@@ -800,7 +802,7 @@ process.on("exit", () => {
 });
 process.on("SIGTERM", () => {
     try {
-        serverProcess?.kill();
+        mcpServer.killChild();
     } catch {
         // Already exited or never started; nothing to clean up.
     }
@@ -813,7 +815,7 @@ process.on("SIGTERM", () => {
 });
 process.on("SIGINT", () => {
     try {
-        serverProcess?.kill();
+        mcpServer.killChild();
     } catch {
         // Already exited or never started; nothing to clean up.
     }
@@ -1055,25 +1057,7 @@ function timestampPrefix(): string {
 
 // ─── log routing ─────────────────────────────────────────────────────────────
 
-function routeStdoutLine(line: string) {
-    for (const out of formatLogLine(line)) {
-        channelTokenSaver.appendLine(out);
-    }
-}
 
-function handleStdoutChunk(chunk: Buffer) {
-    const { lines, rest } = splitChunk(stdoutLineBuffer, chunk.toString());
-    stdoutLineBuffer = rest;
-    for (const line of lines) {
-        if (!line) continue;
-        const port = listeningPort(line);
-        if (port !== null) {
-            actualServerPort = port;
-            log(`Server reported port: ${actualServerPort}`);
-        }
-        routeStdoutLine(line);
-    }
-}
 
 // ─── MCP server lifecycle ────────────────────────────────────────────────────
 
@@ -1122,256 +1106,14 @@ function mcpExePath(): string {
     return tokenSaverInstalledExePath();
 }
 
-async function startServer() {
-    const cfg = vscode.workspace.getConfiguration("tokenSaver");
-    const port = cfg.get<number>("server.port", 11436);
 
-    // ── Service mode ────────────────────────────────────────────────────────
-    // If TokenSaverMCP is registered as a Windows service (installed via
-    // src/Installers/TokenSaver.Setup, running from Program Files\TokenSaver), adopt it instead
-    // of spawning our own bundled copy — same pattern as startSimpleModelServer's service-mode
-    // branch above. No idle-shutdown timer is scheduled in this mode: a service is meant to
-    // stay running independent of this VS Code window's lifecycle, unlike a
-    // spawn()-managed child process this extension owns.
-    if (await isServiceInstalled(TOKENSAVER_SERVICE_NAME)) {
-        usingTokenSaverWindowsService = true;
-        log("TokenSaverMCP Windows service detected.");
-        if (!(await isPortOpen("127.0.0.1", port))) {
-            log("Starting TokenSaverMCP service...");
-            await runSc(["start", TOKENSAVER_SERVICE_NAME]);
-        }
-        try {
-            await waitForPortOpen("127.0.0.1", port, cfg.get<number>("server.startTimeout", 30));
-        } catch {
-            log("TokenSaverMCP service did not become reachable in time.");
-        }
-        if (await verifyMcpServer(port)) {
-            actualServerPort = port;
-            updateStatus("running");
-            log("TokenSaverMCP service is reachable.");
-        } else {
-            updateStatus("error");
-            log(`TokenSaverMCP service is running but /mcp did not respond on port ${port}.`);
-        }
-        tokenSaverEventLog.start();
-        return;
-    }
-    usingTokenSaverWindowsService = false;
-    tokenSaverEventLog.stop();
-
-    // ── Process mode (legacy: extension spawns and owns the child process) ──
-    if (serverProcess) {
-        updateStatus("running");
-        scheduleIdleShutdown();
-        return;
-    }
-    if (serverStartPromise) {
-        await serverStartPromise;
-        scheduleIdleShutdown();
-        return;
-    }
-    if (stoppingServerProcess) await stoppingServerProcess;
-    if (serverProcess) {
-        updateStatus("running");
-        scheduleIdleShutdown();
-        return;
-    }
-
-    const existingPort = await findOpenPortInRange("127.0.0.1", port, 10);
-    if (existingPort !== null) {
-        if (await verifyMcpServer(existingPort)) {
-            actualServerPort = existingPort;
-            updateStatus("running");
-            log(`Port ${existingPort} already open — adopting existing server.`);
-            scheduleIdleShutdown();
-            return;
-        }
-        log(
-            `Port ${existingPort} is open but /mcp did not respond to verification — ` +
-            `not adopting existing listener. Starting TokenSaver on port ${port}.`,
-        );
-    }
-
-    updateStatus("starting");
-    stdoutLineBuffer = "";
-
-    const timeoutSec = cfg.get<number>("server.startTimeout", 30);
-    const projectPathOverride = cfg.get<string>("dotnet.projectPath", "");
-    const dotnet = cfg.get<string>("dotnet.command", "dotnet");
-
-    let spawnArgs: { cmd: string; args: string[] };
-    if (projectPathOverride) {
-        // Dev mode: dotnet run --project <path>
-        spawnArgs = {
-            cmd: dotnet,
-            args: ["run", "--project", projectPathOverride],
-        };
-    } else {
-        // Installed mode: run the MSI-installed exe directly (Program Files\TokenSaver)
-        spawnArgs = { cmd: mcpExePath(), args: [] };
-    }
-
-    log(`Launching: ${spawnArgs.cmd} ${spawnArgs.args.join(" ")}`);
-
-    try {
-        const workspaceRoot =
-            vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? "";
-        const autoCodeHelper = cfg.get<boolean>(
-            "autoCodeHelper.enabled",
-            false,
-        );
-
-        serverProcess = spawn(spawnArgs.cmd, spawnArgs.args, {
-            env: {
-                ...process.env,
-                VSCODE_LOGS: "1",
-                // Tells the server it was launched by the VS Code extension and should
-                // use HTTP-only transport (no stdio MCP transport). Without this, the
-                // server detects Console.IsInputRedirected=true (stdin=NUL from "ignore")
-                // and adds the stdio transport, which immediately sees EOF and shuts down.
-                TOKENSAVER_HTTP_ONLY: "1",
-                // Tells TokenSaver.MCP where to write .local-mcp.
-                // AddEnvironmentVariables("TOKENSAVER_") maps TOKENSAVER_TokenSaver__WorkspaceRoot
-                // to the config key TokenSaver:WorkspaceRoot (double-underscore = section separator).
-                // We also set the bare TOKENSAVER_WorkspaceRoot so GetWorkspaceRoot() can
-                // read it directly as a fallback if section binding fails.
-                ...(workspaceRoot
-                    ? {
-                          TOKENSAVER_TokenSaver__WorkspaceRoot: workspaceRoot,
-                          TOKENSAVER_WorkspaceRoot: workspaceRoot,
-                      }
-                    : {}),
-                // CodeHelper auto-workflow toggle
-                TOKENSAVER_TokenSaver__CodeHelper__AutoEnabled:
-                    String(autoCodeHelper),
-            },
-            stdio: ["ignore", "pipe", "pipe"],
-            windowsHide: true,
-        });
-    } catch (err) {
-        updateStatus("error");
-        log(`Failed to spawn server: ${(err as Error).message}`);
-        notify("error", "TokenSaver failed to start.");
-        serverProcess = null;
-        return;
-    }
-
-    if (!serverProcess.pid) {
-        updateStatus("error");
-        log("Server process failed to obtain a PID.");
-        notify("error", "TokenSaver failed to start.");
-        serverProcess = null;
-        return;
-    }
-
-    serverProcess.stdout?.on("data", (chunk: Buffer) =>
-        handleStdoutChunk(chunk),
-    );
-    serverProcess.stderr?.on("data", (chunk: Buffer) =>
-        channelTokenSaver.append(chunk.toString()),
-    );
-    serverProcess.on("exit", (code, signal) => {
-        actualServerPort = null;
-        serverProcess = null;
-        clearIdleTimer();
-        // Treat as clean stop if: normal exit (code=0), no signal (signal=null, Windows),
-        // or the stop was initiated by stopServer() (serverStopIntentional covers SIGTERM/SIGKILL
-        // on macOS/Linux where proc.kill() results in code=null signal=SIGTERM rather than code=0).
-        if (code === 0 || signal === null || serverStopIntentional) {
-            updateStatus("stopped");
-            notify("info", "TokenSaver stopped.");
-        } else {
-            updateStatus("error");
-            log(`Server exited with code=${code} signal=${signal}`);
-            notify("error", `TokenSaver exited with code ${code}`);
-        }
-        serverStopIntentional = false;
-    });
-    serverProcess.on("error", (err) => {
-        serverProcess = null;
-        clearIdleTimer();
-        updateStatus("error");
-        log(`Server error: ${err.message}`);
-        notify("error", `TokenSaver error: ${err.message}`);
-    });
-
-    serverStartPromise = (async () => {
-        try {
-            await waitForPortOpen("127.0.0.1", port, timeoutSec);
-            if (!(await verifyMcpServer(port))) {
-                throw new Error(`Server process started but /mcp did not respond on port ${port}.`);
-            }
-            updateStatus("running");
-            log("TokenSaver started and reachable.");
-            notify("info", "TokenSaver started.");
-            scheduleIdleShutdown();
-        } catch (err) {
-            updateStatus("error");
-            log(`Startup timeout: ${(err as Error).message}`);
-            serverProcess?.kill();
-            serverProcess = null;
-            throw err;
-        } finally {
-            serverStartPromise = null;
-        }
-    })();
-
-    await serverStartPromise;
-}
-
-async function stopServer() {
-    if (usingTokenSaverWindowsService) {
-        log("Stopping TokenSaverMCP service...");
-        await runSc(["stop", TOKENSAVER_SERVICE_NAME]);
-        tokenSaverEventLog.stop();
-        updateStatus("stopped");
-        return;
-    }
-    clearIdleTimer();
-    if (!serverProcess) {
-        if (stoppingServerProcess) await stoppingServerProcess;
-        updateStatus("stopped");
-        return;
-    }
-    if (stoppingServerProcess) {
-        await stoppingServerProcess;
-        return;
-    }
-
-    const proc = serverProcess;
-    serverProcess = null;
-    serverStopIntentional = true; // suppress error notification for SIGTERM/SIGKILL on macOS/Linux
-    let resolved = false;
-
-    stoppingServerProcess = new Promise<void>((resolve) => {
-        const cleanup = () => {
-            if (resolved) return;
-            resolved = true;
-            stoppingServerProcess = null;
-            updateStatus("stopped");
-            log("TokenSaver stopped.");
-            notify("info", "TokenSaver stopped.");
-            resolve();
-        };
-        proc.once("exit", cleanup);
-        proc.once("error", cleanup);
-        proc.once("close", cleanup);
-        proc.kill();
-        setTimeout(() => {
-            if (!proc.killed) proc.kill("SIGKILL");
-            cleanup();
-        }, 3000);
-    });
-
-    await stoppingServerProcess;
-}
 
 async function restartServer(context: vscode.ExtensionContext) {
     updateStatus("restarting");
-    await stopServer();
+    await mcpServer.stop();
     await stopSimpleModelServer();
     await startSimpleModelServer(context);
-    await startServer();
+    await mcpServer.start();
 }
 
 // ─── Manual install prompt (VS Code Copilot, Claude Code, Cursor, Sixth, Continue) ──────────
@@ -1410,9 +1152,9 @@ function registerMcpProvider(context: vscode.ExtensionContext) {
             const provider: vscode.McpServerDefinitionProvider = {
                 async provideMcpServerDefinitions() {
                     await startSimpleModelServer(context);
-                    await startServer();
+                    await mcpServer.start();
                     const port =
-                        actualServerPort ??
+                        mcpServer.port ??
                         vscode.workspace
                             .getConfiguration("tokenSaver")
                             .get<number>("server.port", 11436);
@@ -1429,7 +1171,7 @@ function registerMcpProvider(context: vscode.ExtensionContext) {
                     server,
                 ) {
                     await startSimpleModelServer(context);
-                    await startServer();
+                    await mcpServer.start();
                     return server;
                 },
             };
@@ -1522,12 +1264,12 @@ function showStatusInLog() {
         `MCP server port (configured): ${cfg.get<number>("server.port", 11436)}`,
     );
     channelTokenSaver.appendLine(
-        `MCP server actual port: ${actualServerPort ?? "(not running)"}`,
+        `MCP server actual port: ${mcpServer.port ?? "(not running)"}`,
     );
     channelTokenSaver.appendLine(
-        usingTokenSaverWindowsService
+        mcpServer.usingWindowsService
             ? "MCP server: running as Windows service (TokenSaverMCP)"
-            : `MCP server process running: ${serverProcess !== null}`,
+            : `MCP server process running: ${mcpServer.hasChildProcess}`,
     );
     channelTokenSaver.appendLine(
         usingSimpleModelServerWindowsService
@@ -1559,24 +1301,7 @@ function log(message: string) {
 
 // ─── idle shutdown ───────────────────────────────────────────────────────────
 
-function clearIdleTimer() {
-    if (idleTimer) {
-        clearTimeout(idleTimer);
-        idleTimer = null;
-    }
-}
 
-function scheduleIdleShutdown() {
-    clearIdleTimer();
-    const timeoutSec = vscode.workspace
-        .getConfiguration("tokenSaver")
-        .get<number>("server.idleTimeout", 0);
-    if (!serverProcess || timeoutSec <= 0) return;
-    idleTimer = setTimeout(async () => {
-        log(`Idle timeout (${timeoutSec}s) reached — stopping server.`);
-        await stopServer();
-    }, timeoutSec * 1000);
-}
 
 // ─── port utilities ──────────────────────────────────────────────────────────
 
@@ -1772,7 +1497,7 @@ async function installTokenSaverService(context: vscode.ExtensionContext) {
         return;
     }
 
-    usingTokenSaverWindowsService = true;
+    mcpServer.usingWindowsService = true;
     log("TokenSaverMCP service installed and started.");
     vscode.window.showInformationMessage(
         "TokenSaver.MCP installed as Windows service and started. It will now start automatically at login.",
@@ -1828,7 +1553,7 @@ async function uninstallTokenSaverService(context?: vscode.ExtensionContext) {
         }
     }
 
-    usingTokenSaverWindowsService = false;
+    mcpServer.usingWindowsService = false;
     log("TokenSaverMCP service uninstalled.");
     vscode.window.showInformationMessage(
         "TokenSaver.MCP Windows service removed. The extension will manage it as a process instead.",
