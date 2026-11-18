@@ -11,9 +11,11 @@ import {
     removeAuthUser,
 } from "./auth.js";
 import { spawn } from "child_process";
-import * as net from "node:net";
 import * as path from "path";
 import * as fs from "fs";
+import { isPortOpen, waitForPortOpen, findOpenPortInRange } from "./net.js";
+import { fetchHealthOk, waitForHealthOk } from "./health.js";
+import { isServiceInstalled, runSc, runMsiexec } from "./windowsServices.js";
 
 let channelTokenSaver: vscode.OutputChannel;
 let channelSimpleModelServer: vscode.OutputChannel;
@@ -556,14 +558,6 @@ async function runFullSetup(context: vscode.ExtensionContext): Promise<void> {
 }
 
 /** Polls a /health-style endpoint until it reports ok/degraded or the timeout elapses. */
-async function waitForHealthOk(healthUrl: string, timeoutSec: number): Promise<boolean> {
-    const deadline = Date.now() + timeoutSec * 1000;
-    while (Date.now() < deadline) {
-        if (await fetchHealthOk(healthUrl)) return true;
-        await new Promise((r) => setTimeout(r, 2000));
-    }
-    return false;
-}
 
 /** Polls the TokenSaver /mcp endpoint until it responds or the timeout elapses. */
 async function waitForMcpReachable(port: number, timeoutSec: number): Promise<boolean> {
@@ -1031,22 +1025,6 @@ export async function checkAndHealSimpleModelServer(
     }
 }
 
-async function fetchHealthOk(healthUrl: string): Promise<boolean> {
-    const cfg = vscode.workspace.getConfiguration("tokenSaver");
-    const timeoutMs = cfg.get<number>("simpleModelServer.startTimeout", 120) * 1000;
-    try {
-        const res = await fetch(healthUrl, {
-            signal: AbortSignal.timeout(timeoutMs),
-        });
-        // 200 = healthy, 503 = degraded (models loading) — both mean the process is running.
-        // Only a connection error (fetch throws) means it's truly dead.
-        if (res.status !== 200 && res.status !== 503) return false;
-        const body = (await res.json()) as { status?: string };
-        return body.status === "ok" || body.status === "degraded";
-    } catch {
-        return false;
-    }
-}
 
 function timestampPrefix(): string {
     // Matches the yyyy-MM-dd HH:mm:ss convention already used by SimpleModelServer/TokenSaver.MCP's
@@ -1785,34 +1763,7 @@ function scheduleIdleShutdown() {
 
 // ─── port utilities ──────────────────────────────────────────────────────────
 
-async function waitForPortOpen(host: string, port: number, timeoutSec: number) {
-    const deadline = Date.now() + timeoutSec * 1000;
-    while (Date.now() < deadline) {
-        if (await isPortOpen(host, port)) return;
-        await new Promise((r) => setTimeout(r, 500));
-    }
-    throw new Error(
-        `Did not become reachable on ${host}:${port} within ${timeoutSec}s.`,
-    );
-}
 
-async function isPortOpen(host: string, port: number): Promise<boolean> {
-    return new Promise((resolve) => {
-        const socket = new net.Socket();
-        let done = false;
-        const finish = (result: boolean) => {
-            if (!done) {
-                done = true;
-                socket.destroy();
-                resolve(result);
-            }
-        };
-        socket.once("connect", () => finish(true));
-        socket.once("error", () => finish(false));
-        socket.setTimeout(1000, () => finish(false));
-        socket.connect(port, host);
-    });
-}
 
 async function verifyMcpServer(
     port: number,
@@ -1831,43 +1782,12 @@ async function verifyMcpServer(
     }
 }
 
-async function findOpenPortInRange(
-    host: string,
-    basePort: number,
-    count: number,
-): Promise<number | null> {
-    for (let i = 0; i <= count; i++) {
-        if (await isPortOpen(host, basePort + i)) return basePort + i;
-    }
-    return null;
-}
 
 // ── Windows Service helpers ───────────────────────────────────────────────────
 
 /** Returns true if the given Windows service name is registered with the SCM. */
-async function isServiceInstalled(serviceName: string = SIMPLEMODEL_SERVER_SERVICE_NAME): Promise<boolean> {
-    try {
-        const { execFile } = await import("child_process");
-        const out = await new Promise<string>((resolve, reject) => {
-            execFile(
-                "sc.exe",
-                ["query", serviceName],
-                (err, stdout) => (err && !(stdout ?? "").includes("STATE") ? reject(err) : resolve(stdout ?? "")),
-            );
-        });
-        return out.includes("STATE");
-    } catch {
-        return false;
-    }
-}
 
 /** Runs sc.exe with the given args, returns exit code. */
-async function runSc(args: string[]): Promise<number> {
-    const { execFile } = await import("child_process");
-    return new Promise((resolve) => {
-        execFile("sc.exe", args, (err) => resolve(err ? (typeof err.code === "number" ? err.code : 1) : 0));
-    });
-}
 
 /**
  * Installs SimpleModelServer as a Windows service by running the bundled
@@ -1998,21 +1918,6 @@ async function uninstallSimpleModelServerService(context?: vscode.ExtensionConte
  * expects). If the user declines the UAC prompt, Start-Process throws and we surface that as
  * a distinct failure instead of miscounting it as an MSI-side error.
  */
-async function runMsiexec(args: string[]): Promise<number> {
-    const { execFile } = await import("child_process");
-    // Quote each arg for safe interpolation inside the PowerShell -ArgumentList array literal.
-    const quotedArgs = args.map((a) => `'${a.replace(/'/g, "''")}'`).join(",");
-    const psCommand =
-        `$proc = Start-Process -FilePath 'msiexec.exe' -ArgumentList @(${quotedArgs}) ` +
-        `-Verb RunAs -Wait -PassThru; exit $proc.ExitCode`;
-    return new Promise((resolve) => {
-        execFile(
-            "powershell.exe",
-            ["-NoProfile", "-NonInteractive", "-Command", psCommand],
-            (err) => resolve(err ? (typeof err.code === "number" ? err.code : 1) : 0),
-        );
-    });
-}
 
 /**
  * Installs TokenSaver.MCP as a Windows service (TokenSaverMCP) by running the bundled WiX
