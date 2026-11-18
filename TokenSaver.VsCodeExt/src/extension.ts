@@ -14,6 +14,7 @@ import { spawn } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
 import { ServiceEventLogPoller } from "./serviceEventLog.js";
+import { formatLogLine, listeningPort, splitChunk } from "./stdoutRouting.js";
 import { isPortOpen, waitForPortOpen, findOpenPortInRange } from "./net.js";
 import { fetchHealthOk, waitForHealthOk } from "./health.js";
 import { isServiceInstalled, runSc, runMsiexec } from "./windowsServices.js";
@@ -1055,40 +1056,19 @@ function timestampPrefix(): string {
 // ─── log routing ─────────────────────────────────────────────────────────────
 
 function routeStdoutLine(line: string) {
-    if (!line.startsWith("{")) {
-        channelTokenSaver.appendLine(line);
-        return;
-    }
-    try {
-        const entry = JSON.parse(line) as {
-            ts?: string;
-            lvl?: string;
-            ch?: string;
-            src?: string;
-            msg?: string;
-            ex?: string;
-        };
-        const channel = channelTokenSaver;
-        const ts = entry.ts ? new Date(entry.ts).toLocaleTimeString() : "";
-        const lvl = entry.lvl ?? "INF";
-        const src = entry.src ? ` ${entry.src}:` : "";
-        const msg = entry.msg ?? line;
-        channel.appendLine(`${ts} ${lvl}${src} ${msg}`);
-        if (entry.ex) channel.appendLine(entry.ex);
-    } catch {
-        channelTokenSaver.appendLine(line);
+    for (const out of formatLogLine(line)) {
+        channelTokenSaver.appendLine(out);
     }
 }
 
 function handleStdoutChunk(chunk: Buffer) {
-    stdoutLineBuffer += chunk.toString();
-    const lines = stdoutLineBuffer.split(/\r?\n/);
-    stdoutLineBuffer = lines.pop() ?? "";
+    const { lines, rest } = splitChunk(stdoutLineBuffer, chunk.toString());
+    stdoutLineBuffer = rest;
     for (const line of lines) {
         if (!line) continue;
-        const portMatch = line.match(/Now listening on:.*?:(\d+)/);
-        if (portMatch) {
-            actualServerPort = parseInt(portMatch[1], 10);
+        const port = listeningPort(line);
+        if (port !== null) {
+            actualServerPort = port;
             log(`Server reported port: ${actualServerPort}`);
         }
         routeStdoutLine(line);
