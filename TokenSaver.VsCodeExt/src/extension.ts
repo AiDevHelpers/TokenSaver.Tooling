@@ -1,5 +1,4 @@
 import * as vscode from "vscode";
-import { startIdeBridge } from "./ideBridge.js";
 import { isValidAccount, readAuthToken } from "./auth.js";
 import * as path from "path";
 import * as fs from "fs";
@@ -96,7 +95,6 @@ function maybePromptAddTokenSaverToGitignore(): Promise<void> {
 
 export async function activate(context: vscode.ExtensionContext) {
     migrateLegacySettings();
-    startIdeBridge(context);
 
     channelTokenSaver = vscode.window.createOutputChannel("TokenSaver");
     channelSimpleModelServer = vscode.window.createOutputChannel("SimpleModelServer");
