@@ -27,22 +27,14 @@
     <NoWarn>$(NoWarn);VSEXT0010</NoWarn>
     <!-- The Output Window extensibility API (Views().Output.CreateOutputChannelAsync, used by the
          SimpleModelServer commands to show responses) is still marked preview by the SDK. -->
-    <!-- NU1701: Microsoft.VisualStudio.Sdk (needed for DialogPage/ProvideOptionPageAttribute, see
-         Options/TokenSaverPackage.cs) only ships net472/netstandard2.0 assets on NuGet. That's
-         expected for in-proc VSSDK-compatible extensions: these are compile-time reference
-         assemblies only — at runtime the types resolve against the real Microsoft.VisualStudio.
-         Shell.15.0 already loaded in devenv.exe, not this NuGet copy. -->
-    <NoWarn>$(NoWarn);VSEXTPREVIEW_OUTPUTWINDOW;NU1701</NoWarn>
+    <NoWarn>$(NoWarn);VSEXTPREVIEW_OUTPUTWINDOW</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.VisualStudio.Extensibility.Sdk" Version="17.14.40608" PrivateAssets="all" />
     <PackageReference Include="Microsoft.VisualStudio.Extensibility.Build" Version="17.14.40608" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.VisualStudio.Sdk" Version="17.14.40265" PrivateAssets="all" ExcludeAssets="runtime" />
-    <PackageReference Include="EnvDTE" Version="17.14.40260" />
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="8.0.1" />
     <PackageReference Include="SperryDev.Logger" Version="$(SperryLoggerVersion)" />
-    <PackageReference Include="SperryDev.Ide.Bridge" Version="0.1.0" />
     <PackageReference Include="MessagePack" Version="2.5.307" />
   </ItemGroup>
 
@@ -82,11 +74,6 @@
              Link="INSTALL_PROMPT.md"
              CopyToOutputDirectory="PreserveNewest"
              IncludeInVSIX="true" />
-  </ItemGroup>
-
-  <!-- Lets the test project exercise the internal bridge listener (BridgeServer) directly. -->
-  <ItemGroup>
-    <InternalsVisibleTo Include="TokenSaver.Vs.Extension.Tests" />
   </ItemGroup>
 
   <!-- Override the repo-wide Nerdbank.GitVersioning (3.9.50, injected by Directory.Build.props)

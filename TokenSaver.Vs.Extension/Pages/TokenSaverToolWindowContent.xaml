@@ -192,16 +192,6 @@
                                             <TextBlock Style="{StaticResource Help}" Margin="0,1,0,0" Text="Lets the server run its automatic code workflow (the auto code helper)." />
                                         </StackPanel>
                                     </CheckBox>
-                                    <CheckBox IsChecked="{Binding ShowLogsOnQuery}" Margin="0,12,0,0" AutomationProperties.Name="Show logs the AI reads">
-                                        <StackPanel>
-                                            <TextBlock Style="{StaticResource Label}" Margin="0" Text="Show logs the AI reads" />
-                                            <TextBlock Style="{StaticResource Help}" Margin="0,1,0,0" Text="Opens a Windows Terminal tab with the log whenever the AI queries a log file, so you can follow it too." />
-                                        </StackPanel>
-                                    </CheckBox>
-
-                                    <TextBlock Style="{StaticResource Label}" Text="Run tests with" />
-                                    <ComboBox ItemsSource="{Binding TestRunners}" SelectedItem="{Binding TestRunner}" Width="240" HorizontalAlignment="Left" AutomationProperties.Name="Run tests with" />
-                                    <TextBlock Style="{StaticResource Help}" Text="Test Explorer, or dotnet test with TRX results." />
                                 </StackPanel>
                             </StackPanel>
                         </Border>
@@ -432,13 +422,6 @@
                         <Button Content="Start" Command="{Binding StartSimpleModelServerCommand}" />
                         <Button Content="Install" Command="{Binding InstallSimpleModelServerCommand}" />
                         <Button Content="Uninstall" Command="{Binding UninstallSimpleModelServerCommand}" />
-                    </StackPanel>
-
-                    <TextBlock Text="IDE bridge" FontWeight="Bold" Margin="0,18,0,4" />
-                    <TextBlock Text="{Binding BridgeStatus}" Margin="0,0,0,6" />
-                    <StackPanel Orientation="Horizontal">
-                        <Button Content="Start" Command="{Binding StartBridgeCommand}" />
-                        <Button Content="Stop" Command="{Binding StopBridgeCommand}" />
                     </StackPanel>
 
                     <TextBlock Text="Setup" FontWeight="Bold" Margin="0,18,0,4" />

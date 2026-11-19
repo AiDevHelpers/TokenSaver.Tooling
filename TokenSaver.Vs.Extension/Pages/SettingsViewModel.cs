@@ -26,8 +26,6 @@ namespace TokenSaver.Vs.Extension.Pages;
 [DataContract]
 internal sealed class SettingsViewModel : NotifyPropertyChangedObject
 {
-    private const string TestExplorer = "Test Explorer";
-    private const string DotnetTest = "dotnet test";
 
     private bool _loading;
     private string _status = "";
@@ -46,8 +44,6 @@ internal sealed class SettingsViewModel : NotifyPropertyChangedObject
     private bool _buildContextAtStartup;
     private bool _registerWithClients;
     private bool _autoWorkflow;
-    private bool _showLogsOnQuery;
-    private string _testRunner = TestExplorer;
 
     // Limits and endpoints
     private string _contextLimit = "";
@@ -209,8 +205,6 @@ internal sealed class SettingsViewModel : NotifyPropertyChangedObject
 
     [DataMember] public string NewUserAccount { get => _newUserAccount; set => SetProperty(ref _newUserAccount, value); }
 
-    [DataMember] public IReadOnlyList<string> TestRunners { get; } = [TestExplorer, DotnetTest];
-
     // Names of TokenSaver.Common.Core EndpointSelectStrategy. The extension doesn't reference that assembly.
     [DataMember] public IReadOnlyList<string> EndpointStrategies { get; } = ["Failover", "RoundRobin", "Explicit"];
 
@@ -242,10 +236,6 @@ internal sealed class SettingsViewModel : NotifyPropertyChangedObject
     [DataMember] public bool RegisterWithClients { get => _registerWithClients; set => Set(ref _registerWithClients, value); }
 
     [DataMember] public bool AutoWorkflow { get => _autoWorkflow; set => Set(ref _autoWorkflow, value); }
-
-    [DataMember] public bool ShowLogsOnQuery { get => _showLogsOnQuery; set => Set(ref _showLogsOnQuery, value); }
-
-    [DataMember] public string TestRunner { get => _testRunner; set => Set(ref _testRunner, value); }
 
     // ── Limits and endpoints ──
     [DataMember] public string ContextLimit { get => _contextLimit; set => Set(ref _contextLimit, value); }
@@ -358,8 +348,6 @@ internal sealed class SettingsViewModel : NotifyPropertyChangedObject
         BuildContextAtStartup = Flag(McpSettingsFile.GetPath(root, "ContextHelper:AutoWarmOnStartup"), true);
         RegisterWithClients = Flag(McpSettingsFile.Get(root, "AutoRegisterProviders"), true);
         AutoWorkflow = Flag(McpSettingsFile.GetPath(root, "CodeHelper:AutoEnabled"), false);
-        ShowLogsOnQuery = Flag(McpSettingsFile.GetPath(root, "LogViewer:AutoOpenOnQuery"), false);
-        TestRunner = Str(root, "IdeTestRunMode", "TestExplorer") == "DotnetTest" ? DotnetTest : TestExplorer;
 
         // The server has two context limits (the pipeline's and the cleaner's) and both default to 120,000. One
         // field sets both; show the pipeline's, which is the one that sizes built context.
@@ -474,8 +462,6 @@ internal sealed class SettingsViewModel : NotifyPropertyChangedObject
         McpSettingsFile.SetPath(root, "ContextHelper:AutoWarmOnStartup", JsonValue.Create(BuildContextAtStartup));
         McpSettingsFile.Set(root, "AutoRegisterProviders", JsonValue.Create(RegisterWithClients));
         McpSettingsFile.SetPath(root, "CodeHelper:AutoEnabled", JsonValue.Create(AutoWorkflow));
-        McpSettingsFile.SetPath(root, "LogViewer:AutoOpenOnQuery", JsonValue.Create(ShowLogsOnQuery));
-        McpSettingsFile.Set(root, "IdeTestRunMode", JsonValue.Create(TestRunner == DotnetTest ? "DotnetTest" : "TestExplorer"));
 
         McpSettingsFile.Set(root, "ContextSizeLimit", JsonValue.Create(contextLimit));
         McpSettingsFile.SetPath(root, "ContextHelper:ContextSizeLimit", JsonValue.Create(contextLimit));
