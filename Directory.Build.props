@@ -1,0 +1,85 @@
+<Project>
+  <PropertyGroup Label="SperryDev.Logger version">
+    <!-- Pinned to the SperryDev.Logger build that has the SperryDev.Logger.Configuration namespace; CI sets the
+         same value. Floating ranges (0.*-*, 0.*) resolved to builds without it and broke restore on 2026-11-15.
+         Bump deliberately, here and in .github/workflows/ci.yml together. -->
+    <SperryLoggerVersion Condition="'$(SperryLoggerVersion)' == ''">0.1.12-gf10ffa299f</SperryLoggerVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Build Output Staging" Condition="'$(MSBuildProjectExtension)' != '.esproj' And '$(MSBuildProjectExtension)' != '.pyproj'">
+    <!-- Route bin/obj for every ordinary .NET project (including the WiX installer's own
+         intermediates) into a shared build\staging\<ProjectName>\ folder at the repo root
+         instead of scattering bin/obj under each project directory. TokenSaver.Setup.wixproj
+         sets its own explicit <OutputPath> (build\dist\, the final MSI drop) directly in its
+         project file, which is evaluated after this Directory.Build.props and so still wins for
+         final output — only its intermediate obj/ moves here.
+         Excluded: .esproj (TokenSaver.VsCodeExt — no .NET compilation, builds via npm/tsc + a
+         custom script, no bin/obj to redirect) and .pyproj (TokenSaver.RetrievalBenchmark — no
+         compilation at all, PTVS project used purely for VS solution organization). -->
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)build\staging\$(MSBuildProjectName)\obj\</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(MSBuildThisFileDirectory)build\staging\$(MSBuildProjectName)\bin\</BaseOutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- SQLitePCLRaw.lib.e_sqlite3 is a transitive dependency that is never loaded at runtime:
+         TokenSaver.Library uses bundle_winsqlite3 (OS SQLite), not the bundled e_sqlite3.
+         No patched version exists yet (latest is 2.1.11, still flagged).
+         Remove this suppression once a fixed version is available on NuGet. -->
+    <NuGetAuditSuppress>$(NuGetAuditSuppress);https://github.com/advisories/GHSA-2m69-gcr7-jv3q</NuGetAuditSuppress>
+    <!-- NU1903 = high-severity vulnerability audit warning.
+         SQLitePCLRaw.lib.e_sqlite3 is a transitive dep never loaded at runtime
+         (we use bundle_winsqlite3). No patched version exists yet. -->
+    <NoWarn>$(NoWarn);NU1903</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Code Quality Enforcement">
+    <!-- 
+      To enable warnings-as-errors in CI/CD, set environment variable:
+        - Windows/PowerShell: $env:ENFORCE_CODE_QUALITY = "true"
+        - Linux/Bash: export ENFORCE_CODE_QUALITY=true
+        - Azure DevOps: Add pipeline variable ENFORCE_CODE_QUALITY = true
+    -->
+    <TreatWarningsAsErrors Condition="'$(ENFORCE_CODE_QUALITY)' == 'true'">true</TreatWarningsAsErrors>
+
+    <!-- Enforce code analysis on every build -->
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-all</AnalysisLevel>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Test project analyzer relaxations" Condition="$(MSBuildProjectName.EndsWith('.Tests'))">
+    <!-- Performance and API-shape rules that add noise without value in test code:
+         CA1861 constant array arguments, CA1849 sync calls in async tests, CA1806 ignored TryParse results,
+         CA1307/CA1308 culture and casing style. Production projects keep the full set. -->
+    <NoWarn>$(NoWarn);CA1861;CA1849;CA1806;CA1307;CA1308</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Deterministic Builds">
+    <!-- Enable deterministic/reproducible builds for CI/CD -->
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <!--
+    Versioning: Nerdbank.GitVersioning derives Version/AssemblyVersion/FileVersion/
+    InformationalVersion for every project from version.json at the repo root plus git
+    height (commits since the version was last bumped there). No manual per-release version
+    bumping needed outside version.json. See docs/versioning.md.
+
+    Excluded for .esproj (TokenSaver.VsCodeExt): esproj has no TargetFramework and doesn't
+    support ordinary NuGet PackageReferences — RestoreProjectStyle=Unknown in the .esproj
+    tells `dotnet restore`/build to skip package-graph restore for it, but NuGet's newer
+    restore targets (seen in VS 18's Microsoft.NuGet.targets, and confirmed independently on
+    Linux builds — see https://github.com/dotnet/Nerdbank.GitVersioning/issues/1092) still
+    try to resolve this solution-wide PackageReference against the esproj and fail with
+    "Your project does not reference '.NETCoreApp,Version=v6.0' framework...". Excluding NBGV
+    here (rather than relying on RestoreProjectStyle alone) is the fix confirmed upstream.
+
+    Also excluded for .pyproj (TokenSaver.RetrievalBenchmark): same "not a .NET project" reasoning
+    — no TargetFramework, no NuGet package graph to version.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Nerdbank.GitVersioning" Version="3.10.94" PrivateAssets="all"
+                       Condition="'$(MSBuildProjectExtension)' != '.esproj' And '$(MSBuildProjectExtension)' != '.pyproj'" />
+  </ItemGroup>
+</Project>
