@@ -7,6 +7,9 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      # Nerdbank's managed git engine fails on this history; use the git CLI instead.
+      NBGV_GitEngine: Git
     steps:
       - uses: actions/checkout@v4
         with:
