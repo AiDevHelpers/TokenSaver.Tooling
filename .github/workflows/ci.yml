@@ -9,7 +9,7 @@ jobs:
     runs-on: windows-latest
     env:
       # Nerdbank's managed git engine fails on this history; use the git CLI instead.
-      NBGV_GitEngine: Git
+      NBGV_GitEngine: LibGit2
     steps:
       - uses: actions/checkout@v4
         with:
